@@ -88,7 +88,7 @@ export function IngredientConfirmationScreen({
         </div>
       ) : null}
 
-      <div className="space-y-4">
+      <div className="ingredient-list">
         {ingredients.map((ingredient, index) => (
           <IngredientRow
             key={index}

@@ -124,7 +124,7 @@ export function MixingScreen({
   }
 
   return (
-    <section className="space-y-5 pb-36">
+    <section className="space-y-5">
       <div className="space-y-3 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
         <p className="text-sm font-medium tracking-wide text-amber-700">分步调饮</p>
         <h1 className="text-3xl leading-tight font-semibold text-stone-900">
@@ -297,7 +297,7 @@ export function MixingScreen({
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              className="min-h-11 rounded-2xl border border-stone-300 px-4 py-3 text-base font-semibold text-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mobile-action mobile-action--secondary"
               disabled={isSubmitting || currentStep === 0}
               onClick={() => void handleAction("BACK_MIXING")}
             >
@@ -305,7 +305,7 @@ export function MixingScreen({
             </button>
             <button
               type="button"
-              className="min-h-11 rounded-2xl bg-stone-900 px-4 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+              className="mobile-action mobile-action--primary"
               disabled={isSubmitting}
               onClick={() => void handleAction("ADVANCE_MIXING")}
             >

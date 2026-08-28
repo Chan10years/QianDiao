@@ -14,14 +14,14 @@ export interface TasteSliderProps {
 
 export function TasteSlider({ id, label, value, onChange, minLabel, maxLabel }: TasteSliderProps) {
   return (
-    <fieldset className="space-y-3">
-      <legend className="text-base font-medium text-stone-900">{label}</legend>
-      <div className="flex items-center gap-3">
-        <span className="min-w-12 text-sm text-stone-500">{minLabel}</span>
+    <fieldset className="taste-control">
+      <legend>{label}</legend>
+      <span className="taste-control__value">{value} / 5</span>
+      <div className="taste-control__track">
         <input
           id={id}
           aria-label={label}
-          className="h-11 min-w-0 flex-1 accent-amber-700"
+          className="taste-control__input"
           type="range"
           min={1}
           max={5}
@@ -48,9 +48,12 @@ export function TasteSlider({ id, label, value, onChange, minLabel, maxLabel }: 
             onChange(nextValue);
           }}
         />
-        <span className="min-w-12 text-right text-sm text-stone-500">{maxLabel}</span>
       </div>
-      <p className="text-sm text-stone-600" aria-live="polite">
+      <div className="taste-control__scale" aria-hidden="true">
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
+      </div>
+      <p className="sr-only" aria-live="polite">
         当前：{value}/5
       </p>
     </fieldset>

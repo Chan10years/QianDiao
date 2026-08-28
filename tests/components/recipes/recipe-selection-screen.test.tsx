@@ -248,6 +248,9 @@ describe("recipe selection flow", () => {
 
     render(<SessionShell sessionId={sessionId} client={client} />);
     await screen.findByRole("heading", { name: "选择一套配方" });
+    expect(
+      screen.getByRole("heading", { name: "选择一套配方" }).closest("section"),
+    ).not.toHaveClass("pb-32");
     await user.click(screen.getByRole("radio", { name: "选择 A 保守方案" }));
     await user.click(screen.getByRole("button", { name: "选择方案并开始调饮" }));
 

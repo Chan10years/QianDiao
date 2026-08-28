@@ -425,6 +425,11 @@ YYYY-MM-DD | Task N | commit <sha>
   - 验证：定向组件测试 5 files / 22 passed；`pnpm lint` 0 errors（3 个既有 `<img>` warnings）；Task 1 文件 Prettier check 通过；`pnpm typecheck` 通过；`pnpm test` 64 files / 390 passed / 2 skipped；`pnpm build` 通过；`pnpm test:e2e` 返回 `No tests found`；390×844 与 320px 浏览器几何检查通过。
   - 结果：建立白瓷/米纸/酒液琥珀视觉 tokens、统一 Mobile Shell、进度语义、FixedActionBar safe-area/内容 reserve、Preferences/Scan/Confirmation 共享页面结构与 loading/error/recovery 表达；未改变既有业务 payload 和状态推进。
   - 风险：完整 `pnpm format:check` 仍被未修改的 `docs/baseline/Task-frozen-pre-pivot.md` 历史格式警告阻塞；浏览器 CLI 在当前 Windows 受限环境无法启动，改用 Chrome CDP 设备指标完成真实页面检查；独立 Reviewer 尚未审查。
+- 2026-08-29 | Task 1R | Prototype Visual Integration implementation commit（本 changeset，independent Review pending）
+  - 验证：Task 1R 定向组件测试 8 files / 25 passed；`pnpm lint` 0 errors（3 个 `<img>` warnings）；`pnpm typecheck` 通过；`pnpm test` 64 files / 390 passed / 2 skipped；Task 1R 修改文件 targeted Prettier 全部 unchanged；`git diff --check` 通过；`pnpm build` 通过。完整 `pnpm format:check` 仍仅因未修改的 frozen archive `docs/baseline/Task-frozen-pre-pivot.md` 报告历史格式警告；`pnpm test:e2e` 仍为 Task 7 前已知的 `No tests found` 非阻塞缺口。
+  - 浏览器：使用 fallback Provider、隔离 SQLite 和上传目录，在真实 390×844 与 320px viewport 验证 Preferences、Scan、Confirmation；保留真实四维 range、文件上传/识别/替换、材料 category/brand/ABV/confidence/confirmed/add/delete/guard；FixedActionBar 贴底且无水平溢出；reduced-motion media query 生效。
+  - 结果：将 Prototype 的 paper/wine/cinnabar/green/gold tokens、Kai/Serif/Mono 字体角色、纸卡、背景装饰、Scan 场景和材料确认视觉整合进既有 Next.js 组件；保留 SessionShell、真实 API、`expectedVersion`、恢复与安全边界。修复 Task 1 Review 的三项旧 finding：Shell 成为 bottom reserve 唯一 owner，error recovery 不再错误保持 `aria-busy=true`，小号 accent text 改用深色语义 alias。
+  - 风险：独立 Reviewer 尚未审查；未打包的霞鹜文楷继续依赖系统 fallback；build 保留既有 `UPLOAD_DIR` 动态文件追踪 warning；正式 Playwright E2E 仍由 Task 7 建立。Task 2–6 的业务行为未开始。
 
 ## Decision log
 

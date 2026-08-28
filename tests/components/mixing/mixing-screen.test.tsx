@@ -96,6 +96,9 @@ describe("mixing screen", () => {
     expect(
       await screen.findByRole("heading", { name: "第 1 步：先加入冰块并降温。" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "第 1 步：先加入冰块并降温。" }).closest("section"),
+    ).not.toHaveClass("pb-36");
     expect(client.getRecipeSet).toHaveBeenCalledWith(sessionId);
     expect(screen.getByRole("button", { name: "返回上一步" })).toBeDisabled();
 

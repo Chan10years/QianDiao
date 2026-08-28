@@ -28,28 +28,31 @@ export function IngredientRow({ ingredient, index, onChange, onDelete }: Ingredi
   const update = (patch: Partial<DetectedIngredient>) => onChange({ ...ingredient, ...patch });
 
   return (
-    <article className="space-y-4 rounded-2xl border border-stone-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-stone-900">材料 {rowNumber}</h2>
-          <p className="mt-1 text-xs text-stone-500">
-            识别置信度 {Math.round(ingredient.confidence * 100)}%，请人工核对
-          </p>
+    <article
+      className={
+        ingredient.confirmed ? "ingredient-card ingredient-card--confirmed" : "ingredient-card"
+      }
+    >
+      <div className="ingredient-card__header">
+        <div className="ingredient-card__title">
+          <span className="ingredient-card__dot" aria-hidden="true" />
+          <div>
+            <h2>材料 {rowNumber}</h2>
+            <p className="ingredient-card__meta">
+              识别置信度 {Math.round(ingredient.confidence * 100)}%，请人工核对
+            </p>
+          </div>
         </div>
-        <button
-          className="min-h-11 shrink-0 rounded-xl px-3 text-sm font-medium text-red-700 hover:bg-red-50"
-          type="button"
-          onClick={onDelete}
-        >
-          删除材料 {rowNumber}
-        </button>
+        <span className="ingredient-card__status">
+          {ingredient.confirmed ? "已确认" : "待确认"}
+        </span>
       </div>
 
       <div className="space-y-3">
-        <label className="block space-y-1.5 text-sm font-medium text-stone-800">
+        <label className="form-field">
           <span>材料名称</span>
           <input
-            className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-base font-normal"
+            className="form-control"
             aria-label={`材料 ${rowNumber} 名称`}
             type="text"
             value={ingredient.canonicalName}
@@ -57,10 +60,10 @@ export function IngredientRow({ ingredient, index, onChange, onDelete }: Ingredi
           />
         </label>
 
-        <label className="block space-y-1.5 text-sm font-medium text-stone-800">
+        <label className="form-field">
           <span>受控类别</span>
           <select
-            className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-base font-normal"
+            className="form-control"
             aria-label={`材料 ${rowNumber} 类别`}
             value={ingredient.category}
             onChange={(event) => update({ category: event.target.value as IngredientCategory })}
@@ -73,10 +76,10 @@ export function IngredientRow({ ingredient, index, onChange, onDelete }: Ingredi
           </select>
         </label>
 
-        <label className="block space-y-1.5 text-sm font-medium text-stone-800">
+        <label className="form-field">
           <span>品牌（可选）</span>
           <input
-            className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-base font-normal"
+            className="form-control"
             aria-label={`材料 ${rowNumber} 品牌`}
             type="text"
             value={ingredient.brand ?? ""}
@@ -84,10 +87,10 @@ export function IngredientRow({ ingredient, index, onChange, onDelete }: Ingredi
           />
         </label>
 
-        <label className="block space-y-1.5 text-sm font-medium text-stone-800">
+        <label className="form-field">
           <span>酒精度（ABV）</span>
           <input
-            className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-base font-normal"
+            className="form-control"
             aria-label={`材料 ${rowNumber} 酒精度（ABV）`}
             type="number"
             min={0}
@@ -101,9 +104,9 @@ export function IngredientRow({ ingredient, index, onChange, onDelete }: Ingredi
           />
         </label>
 
-        <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-stone-800">
+        <label className="confirm-field">
           <input
-            className="h-5 w-5 accent-amber-700"
+            className="confirm-control"
             aria-label={`材料 ${rowNumber} 已确认`}
             type="checkbox"
             checked={ingredient.confirmed}
@@ -112,6 +115,13 @@ export function IngredientRow({ ingredient, index, onChange, onDelete }: Ingredi
           <span>我确认这项材料确实存在，名称和类别正确</span>
         </label>
       </div>
+      <button
+        className="mobile-action mobile-action--secondary ingredient-card__delete"
+        type="button"
+        onClick={onDelete}
+      >
+        删除材料 {rowNumber}
+      </button>
     </article>
   );
 }

@@ -78,7 +78,7 @@ export function RecipeSelectionScreen({
   }
 
   return (
-    <section className="space-y-6 pb-32">
+    <section className="space-y-6">
       <div className="space-y-3">
         <p className="text-sm font-medium tracking-wide text-amber-700">第五步 · 选择方案</p>
         <h1 className="text-3xl leading-tight font-semibold text-stone-900">选择一套配方</h1>
@@ -133,7 +133,7 @@ export function RecipeSelectionScreen({
       <FixedActionBar>
         <button
           type="button"
-          className="min-h-11 w-full rounded-2xl bg-stone-900 px-5 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+          className="mobile-action mobile-action--primary w-full"
           disabled={selectedRecipe === undefined || !selectedWarnAcknowledged || isSubmitting}
           onClick={() => void handleSelect()}
         >

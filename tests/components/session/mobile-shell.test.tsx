@@ -65,6 +65,7 @@ describe("mobile shell", () => {
     render(<SessionShell sessionId={preferencesSnapshot.session.id} client={client} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("会话暂时不可用");
+    expect(screen.getByRole("main", { name: "调饮实验" })).not.toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("button", { name: "重新加载会话" })).toBeInTheDocument();
   });
 
@@ -72,6 +73,7 @@ describe("mobile shell", () => {
     render(<ProgressHeader state="SCAN" />);
 
     expect(screen.getByRole("banner", { name: "调饮实验进度" })).toBeInTheDocument();
+    expect(screen.getByText("黔味一口")).toBeInTheDocument();
     expect(screen.getByText("第 2 步")).toBeInTheDocument();
     expect(screen.getByText(/共 9 步/)).toBeInTheDocument();
   });

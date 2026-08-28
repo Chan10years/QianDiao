@@ -62,7 +62,7 @@ export function PreferencesScreen({
   }
 
   return (
-    <form className="mobile-screen space-y-8" onSubmit={handleSubmit}>
+    <form className="mobile-screen space-y-6" onSubmit={handleSubmit}>
       <header className="mobile-page-header">
         <p className="mobile-eyebrow">第一步 · 口味</p>
         <h1>你想喝什么感觉？</h1>
@@ -76,7 +76,7 @@ export function PreferencesScreen({
         </div>
       ) : null}
 
-      <div className="mobile-surface space-y-7 p-5">
+      <div className="preferences-card">
         {sliderDefinitions.map((definition) => (
           <TasteSlider
             key={definition.key}

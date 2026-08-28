@@ -128,22 +128,18 @@ export function SessionShell(_props: SessionShellProps) {
 
   if (isLoading || snapshot === null) {
     return (
-      <main
-        className="mobile-shell"
-        aria-label="调饮实验"
-        aria-busy={isLoading || snapshot === null}
-      >
+      <main className="mobile-shell" aria-label="调饮实验" aria-busy={isLoading}>
         <div className="mobile-shell__inner">
-          <section className="mobile-surface space-y-5 p-6" aria-label="会话恢复">
+          <section className="mobile-surface session-recovery-card" aria-label="会话恢复">
             {errorMessage === null ? (
-              <div className="space-y-3">
+              <div className="session-loading">
                 <p className="mobile-eyebrow">调饮实验</p>
-                <p role="status" aria-live="polite" className="font-semibold text-stone-900">
+                <p role="status" aria-live="polite">
                   正在恢复会话…
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="session-loading">
                 <div className="mobile-notice mobile-notice--error" role="alert">
                   <span className="mobile-notice__label">会话恢复失败</span>
                   <span>{errorMessage}</span>

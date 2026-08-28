@@ -112,13 +112,22 @@ export function CameraScreen({
         </p>
       ) : null}
 
-      <div className="mobile-surface space-y-4 p-5">
-        <label
-          className="mobile-action mobile-action--secondary w-full cursor-pointer border-dashed"
-          htmlFor="overview-image"
-        >
-          {file === null ? "打开相机或选择照片" : "替换照片"}
-        </label>
+      <div className="scan-card">
+        <div className="scan-frame">
+          {file === null ? (
+            <label className="scan-frame__empty" htmlFor="overview-image">
+              <strong>拍摄桌面</strong>
+              <small>酒 · 饮料 · 水果 · 冰块</small>
+            </label>
+          ) : (
+            <>
+              <ImagePreview file={file} />
+              <label className="scan-frame__replace" htmlFor="overview-image">
+                替换照片
+              </label>
+            </>
+          )}
+        </div>
         <input
           id="overview-image"
           className="sr-only"
@@ -137,12 +146,18 @@ export function CameraScreen({
           }}
         />
 
-        {file !== null ? <ImagePreview file={file} /> : null}
-      </div>
-
-      <div aria-live="polite" className="min-h-6 text-sm text-stone-600">
-        {stage === "uploading" ? "正在上传照片…" : null}
-        {stage === "recognizing" ? "正在识别材料…" : null}
+        <div aria-live="polite" className="scan-status">
+          <span className="scan-status__pulse" aria-hidden="true" />
+          <span>
+            {stage === "uploading"
+              ? "正在上传照片…"
+              : stage === "recognizing"
+                ? "正在识别材料…"
+                : file === null
+                  ? "等待拍摄桌面总览"
+                  : "照片已就绪，可以上传识别"}
+          </span>
+        </div>
       </div>
 
       <FixedActionBar>
