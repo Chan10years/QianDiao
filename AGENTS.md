@@ -4,11 +4,14 @@
 
 ## 1. 项目使命
 
-构建一个手机优先、可在笔记本本地运行的白酒创意调饮 Agent：
+构建一个手机优先、可在笔记本本地运行的白酒创意调饮 Agent。当前 Product Pivot 的主流程是：
 
 ```text
-口味 → 拍照 → 识别 → 人工确认 → 三套配方 → 安全裁决
-→ 用户选择 → 分步调制 → 成品反馈 → V2 调整 → 实验记忆
+口味 → 拍摄桌面材料 → AI 识别 → 用户确认/修正/补拍
+→ 后台每批生成 A/B/C 三套 → Zod → deterministic Safety → 推荐排序
+→ 单卡 Swipe → 右滑接受 / 连续左滑三张后主动换一批
+→ MIXING Stepper → “满意吗？”优先反馈
+→ 可选 final drink → COMPLETED，或反馈生成 Vn+1 后重新 MIXING
 ```
 
 当前范围是私人学习原型和本地 MVP。硬件控制、登录、多用户、云部署、RAG、向量数据库、抓取小红书和微服务不在范围内。
@@ -17,10 +20,12 @@
 
 按顺序阅读：
 
-1. `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`：已批准的产品与架构真相源。
-2. `Task.md`：实施顺序、当前进度、验证命令与决策记录。
+1. `docs/superpowers/specs/2026-08-28-guikesong-yqz-product-pivot.md`：当前产品交互、MVP 范围和覆盖决策的最高真相源。
+2. `Task.md`：当前 Product Pivot 实施顺序、进度、验证命令与决策记录。
 3. `PRODUCTION.md`：涉及运行、环境变量、数据库、图片、局域网、日志、备份或发布时必读。
-4. 当前目录下更近的 `AGENTS.md`（若存在）。
+4. `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`：继承的 baseline 架构参考，未被新 Spec 覆盖的后端、安全和运行决策继续有效。
+5. `docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`：继承的 Task 13A/13B Feedback / Adjustment 后端参考；旧 Task 13C 不属于当前计划。
+6. 当前目录下更近的 `AGENTS.md`（若存在）。
 
 发生冲突时：平台授权与安全边界 > 当前明确用户指令 > 已批准架构规格 > `Task.md` 实施细节。若用户指令改变已冻结产品或架构，先同步更新规格和 Decision Log；不要把冲突静默写进代码。
 
@@ -87,6 +92,12 @@ pnpm db:seed
 
 如果实际仓库状态与计划不符，先调查并更新计划；不要假装文件、接口或依赖已经存在。
 
+### Agent 分工
+
+- Codex：负责调查、实施、测试、修复和提交。
+- Claude Code：只做独立 Reviewer；默认不得修改生产代码、测试、migration 或文档，输出 `PASS/FAIL + Critical/Important/Minor findings`。
+- Reviewer FAIL 后由 Codex 定点修复，再重新审查；Codex 与 Claude Code 不得同时写同一代码。
+
 ## 7. 架构不变量
 
 依赖方向：
@@ -106,6 +117,17 @@ UI → API → Application → Domain/Workflow/Agent/Safety
 - 所有外部 JSON、数据库 JSON 字段和客户端输入都经过 Zod 校验。
 - 会话状态只能通过 `src/workflow/` 的合法转换推进。
 - 每个针对既有会话的变更 API 实现 `requestId` 幂等与 `expectedVersion` 乐观并发；创建会话没有既有版本，只要求 `requestId` 幂等。
+
+### 7.1 Product Pivot 不变量
+
+- 初次后台仍然每批生成恰好 3 个 A/B/C 候选；Provider 不因 Swipe UI 改成每次只生成一张。
+- UI 一次只展示一张 Recipe Card，展示顺序按 recommendation ranking，而不是强制 A → B → C。
+- 左滑只是前端浏览/拒绝当前候选的动作，不等于饮后 `accepted=false`，也不是后端 feedback。
+- 三张全拒绝后必须由用户主动点击“换一批”；左滑本身不得实时调用模型生成新候选。
+- Mixing 新 UI 不要求 checkpoint photo；旧 checkpoint 数据能力、数据库字段和 migration 保留，不删除旧 checkpoint migration。
+- `FEEDBACK` 首先判断“满意 / 还想调整”；只有“还想调整”才展开详细四维相对 feedback。
+- `final_drink` 是可选图片；跳过 `final_drink` 不得阻止 `COMPLETED`。
+- 不新增 `FINAL_PHOTO` SessionState；分享、分享海报和社交功能不属于当前 MVP。
 
 ## 8. 安全不变量
 
@@ -157,6 +179,8 @@ pnpm build
 ```
 
 涉及数据库时，还要从空数据库运行迁移；涉及手机体验时，还要按 `PRODUCTION.md` 在真实手机上完成指定 smoke test。
+
+当前 Frozen Baseline 的已知 E2E 缺口是：`pnpm test:e2e` 返回 `No tests found`。这只说明 baseline 尚未建立可执行 E2E，不是最终 Demo 的通过结果；新版完整闭环必须在 Task 7 补齐 Playwright E2E，建立后 `pnpm test:e2e` 重新成为阻塞发布门禁。
 
 完成报告必须给出：
 

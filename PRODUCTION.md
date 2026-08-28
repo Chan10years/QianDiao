@@ -1,8 +1,9 @@
 # Production and Local Demo Runbook
 
 状态：基线运行规范  
-最后更新：2026-08-21  
-架构真相源：`docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`
+最后更新：2026-08-28
+当前产品真相源：`docs/superpowers/specs/2026-08-28-guikesong-yqz-product-pivot.md`
+继承架构参考：`docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`、`docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
 
 ## 1. 目的与边界
 
@@ -99,6 +100,8 @@ pnpm test
 pnpm build
 ```
 
+Windows 如果 `corepack enable` 因 Node 安装目录权限返回 `EPERM`，可以直接使用 `corepack pnpm <command>`（例如 `corepack pnpm install --frozen-lockfile`）。不要因此修改 `packageManager`，也不要安装随机的全局 pnpm。
+
 Windows 用户如果没有 `cp`，手动复制 `.env.example` 为 `.env.local`。不要把真实密钥写回 `.env.example`。
 
 `pnpm db:seed` 只写可公开的本地 fallback 配方和规则演示数据，不写任何用户照片、真实会话或密钥。
@@ -172,6 +175,17 @@ pnpm start --hostname 0.0.0.0 --port 3000
 - 一张测试图可以上传、读取元数据并删除测试会话。
 - fallback 模式可以生成恰好三套方案。
 - Safety 规则版本成功加载。
+- 单卡 Recipe Selection 可用。
+- Recipe Card 首张为 recommendation ranking 的推荐方案。
+- 三张全拒绝后，用户可以主动点击“换一批”。
+- “换一批”重新得到三套经过 Zod 与 Safety 的有效 Recipe。
+- 右滑接受候选后可以进入 MIXING。
+- Mixing 不要求 checkpoint photo。
+- 刷新后 `currentStep` 可以恢复。
+- 不满意反馈可以生成并接受 Vn+1。
+- 满意反馈可以拍摄 final drink。
+- final drink 可以跳过。
+- 拍摄或跳过 final drink 的两条满意路径均可以进入 `COMPLETED`。
 
 ## 8. 图片与存储运维
 
@@ -285,8 +299,11 @@ data/uploads/
 | 手机打不开页面 | 绑定、网络、防火墙 | 从本机 health 开始逐层检查 | 手机 health 返回 200 |
 | 上传 413 | 文件过大 | 使用客户端压缩提示或重拍 | 标准化图成功保存 |
 | 上传 415/422 | HEIC、伪造或损坏 | 提示 JPEG/兼容相机模式 | 用户可换图或手录 |
+| final drink 上传失败 | 网络或图片校验失败 | 保留满意结果，提示重试或“跳过 final drink” | 用户跳过后仍可进入 `COMPLETED` |
 | 识别一直失败 | Provider/网络 | 切换手动确认或 fallback vision | 状态可进入 READY |
 | 生成超时 | Provider/搜索 | 搜索立即降级；模型重试一次后 fallback | 得到三套有效候选 |
+| 换一批 regenerate 失败 | Provider、Safety 或版本冲突 | 保留当前三张候选和 `RECIPE_SELECTION`，提示重试；不自动重复调用 | 用户主动重试后得到新的三套 Safety-valid 候选，或回到上一个可用批次 |
+| 重复 select / 网络响应丢失 | 用户重复点击或响应在提交后丢失 | 用原 `requestId` 重放；重新 GET 会话快照，不用新 request 猜测结果 | 只进入一次 `MIXING`，版本和选中配方不重复写入 |
 | 候选连续 BLOCK | 模型忽略约束 | 最多修复两轮后本地替换 | 三套均为 ALLOW/WARN |
 | 409 冲突 | 重复点击/旧页面 | 重新获取会话快照 | 无重复副作用 |
 | SQLite busy | 重复进程或长事务 | 阻止继续写，确认只有一个应用进程 | 写入测试成功 |
@@ -328,9 +345,20 @@ pnpm db:seed
 - [ ] 验证 ABV 强制确认。
 - [ ] 验证能量饮料组合 `BLOCK`。
 - [ ] 验证 `WARN` 需要显式确认且不用颜色作为唯一信息。
-- [ ] 三套方案实质不同、推荐明确、均可由用户选择。
-- [ ] 从调饮中途刷新，恢复到原步骤。
-- [ ] 提交一次反馈并生成 V2。
+- [ ] 后台一批确实持久化三套 A/B/C 候选。
+- [ ] 推荐方案首先展示，且展示顺序遵循 recommendation ranking。
+- [ ] 左滑查看下一张，不触发后端生成或反馈。
+- [ ] 三张全部拒绝后显示并点击“换一批”。
+- [ ] 换一批重新得到三套经过 Safety 的候选。
+- [ ] 右滑选择并进入 MIXING。
+- [ ] Mixing 使用纵向 Stepper；刷新后 `currentStep` 恢复。
+- [ ] Mixing 不要求过程照或 checkpoint photo。
+- [ ] 在 `FEEDBACK` 先验证 Satisfaction-first Feedback。
+- [ ] 选择“还想调整”后提交四维 feedback 并生成 V2。
+- [ ] 选择满意后可以拍摄 final photo。
+- [ ] 选择满意后可以跳过 final photo。
+- [ ] 拍摄和跳过两条路径都进入 `COMPLETED`。
+- [ ] final drink 上传失败时仍可跳过并完成。
 - [ ] 连续完成三次完整流程。
 - [ ] 创建一致性备份，并完成一次恢复抽查。
 - [ ] 准备已验证的稳定 build、fallback 数据和演示样例图片。

@@ -1,820 +1,405 @@
-# 白酒创意调饮 Agent MVP Implementation Plan
+# Guikesong YQZ Product Pivot Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Use `superpowers:test-driven-development` for every behavior change and `superpowers:verification-before-completion` before any completion claim.
+> **For agentic workers:** 每个实现 Task 必须使用 `superpowers:test-driven-development`；完成前使用 `superpowers:verification-before-completion`。每个 Task 都必须经过 Codex implementation → commit → Claude Code independent Review；Review FAIL 时由 Codex 定点修复并重新审查，PASS 后才能进入下一个 Task。
 
-**Goal:** 从空仓库实现一个手机经局域网访问、具备视觉确认、三方案生成、确定性安全裁决、分步调饮、反馈调整和结构化实验记忆的本地 MVP。
+**Goal:** 在冻结后端基线上完成手机优先的 Product Pivot：每批生成三套 A/B/C，前端单卡 Swipe，三张全拒绝后用户主动换批，使用可恢复 Mixing Stepper，并以满意优先的反馈、可选 final drink 和 Vn+1 调整闭环收尾。
 
-**Architecture:** 一个 Next.js 模块化单体承载移动端 UI 与 Route Handlers。应用层编排工作流、Agent、Safety、Repository 和 Provider 接口；SQLite/Drizzle、文件上传与模型 SDK 只存在于 infrastructure。所有外部输入经 Zod，所有候选经确定性 Safety；模型和搜索失败时走本地 fallback。
+**Architecture:** 继承现有 Next.js 模块化单体、SQLite/Drizzle、应用层用例、状态机、Provider 接口、确定性 Safety、幂等和乐观并发。前端只改变产品交互和恢复体验；新业务动作必须通过 API → Application → Domain/Workflow/Repository/Provider 的既有方向实现，不让 Swipe 直接触碰数据库或 Provider。
 
 **Tech Stack:** Node.js 24 LTS、pnpm、Next.js 16 App Router、React 19、TypeScript strict、Tailwind CSS 4、Zod 4、SQLite、Drizzle ORM/Kit、better-sqlite3、sharp、Vitest 4、React Testing Library、Playwright、ESLint、Prettier。
 
-**Spec:** `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-28-guikesong-yqz-product-pivot.md`
 
-## Global Constraints
+**Inherited references:**
 
-- 开始每个任务前读根目录 `AGENTS.md`，涉及运行/数据时读 `PRODUCTION.md`。
-- 严格按任务顺序执行；一个任务通过并更新本文件后再进入下一个。
-- 所有功能遵循 Red → Green → Refactor：先写失败测试、亲眼确认目标失败，再写最小实现。
-- 不改变已冻结技术栈；新增依赖、端点、表或产品状态前先停下确认。
-- 不实现硬件、登录、云部署、RAG、向量数据库、小红书爬虫或微服务。
-- `BLOCK` 无绕过路径。任何模型候选在变成可选择方案前必须通过确定性 Safety。
-- 每个针对既有会话的变更 API 同时实现 `requestId` 幂等和 `expectedVersion` 乐观并发；创建会话只要求 `requestId` 幂等。
-- 每个任务最后只提交本任务文件；不要夹带无关格式化或重构。
+- `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`
+- `docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
 
----
+**Frozen baseline:** 旧工程来源 `815add106fdd196c805cc2cc71941455241f0bfb`；本仓库 baseline `b27c353f71fd7f411697cd659c20face56c63bad`。
 
-## 0. 计划使用方式
+## Global constraints
 
-### 执行规则
+- 当前产品交互和 MVP 范围以 Product Pivot Spec 为最高真相源；旧两个 Spec 只在未被覆盖的后端、架构、安全和 Task 13A/13B 语义上继承。
+- 一次只执行一个未完成 Task；当前 Task 0 完成并通过独立 Review 前不得开始 Task 1。
+- 初次生成和每次“换一批”都调用 `generate()`，每批恰好三套 A/B/C；Provider 不因 Swipe 改成单候选生成。
+- UI 一次只展示一张卡；左滑是前端浏览动作，不是 Feedback、`accepted=false` 或模型调用；三张全拒绝后必须由用户主动点击“换一批”。
+- 每个候选在可选择前经过 Zod、确定性 Safety、BLOCK repair/fallback replace 和 recommendation ranking；`BLOCK` 无绕过路径。
+- 既有会话变更继续使用 `requestId` 幂等、`expectedVersion` 乐观并发和事务；重复提交、刷新、网络响应丢失不得产生重复副作用。
+- 不新增 `FINAL_PHOTO` SessionState；旧 checkpoint photo 的数据和 migration 保留，但新版 Mixing UI 不要求或使用它。
+- `FEEDBACK` 首先判断“满意 / 还想调整”；只有不满意才展示四维相对调整和可选备注；`final_drink` 可选，跳过不得阻止 `COMPLETED`。
+- 不实现分享、分享海报、社交、拒绝原因调查、云部署、登录、RAG、向量数据库、爬虫、硬件或新前端框架。
+- 不修改已发布 migration；本计划不能删除旧 checkpoint migration。
+- 不安装新依赖，除非先更新正式规格和本计划并取得用户确认。
+- 每个实现 Task 遵循 Red → Green → Review → Green 修复循环；Codex 与 Claude Code 不同时写同一代码。
 
-- `[ ]` 表示未完成；只有相关验证命令真实通过后才能改成 `[x]`。
-- 如果路径、依赖或接口必须偏离计划，先在 Decision Log 记录“原因、选择、后果”，再修改本文。
-- 每完成一个 Task，在 Progress Log 写日期、提交 SHA、验证结果和遗留风险。
-- 若没有 Git 仓库，Task 1 初始化；之后按任务列出的提交信息提交。
-- 遇到非本任务测试失败，先判断是否是已有失败；不得通过跳过或删除测试继续。
+## Review protocol
 
-### 里程碑
+每一个实现 Task 的固定门禁：
 
-| 里程碑 | 任务 | 可演示结果 |
-|---|---|---|
-| M1 灰盒闭环 | 1–6 | 无 AI、无图片也能建会话、填口味、走状态、安全和数据库 |
-| M2 识别与三方案 | 7–10 | 上传/确认材料，fallback 生成三套安全方案 |
-| M3 手机完整体验 | 11–13 | 手机完成选择、调饮、反馈、持续调整或完成 |
-| M4 真实 Provider 与加固 | 14–17 | 真实模型可切换、搜索可降级、断线可恢复、三次稳定彩排 |
+1. Codex 调查当前接口，写行为失败测试并确认失败原因属于本 Task。
+2. Codex 写最小实现，运行 Task 局部测试和受影响的更大门禁。
+3. Codex 只提交本 Task 范围内文件。
+4. Claude Code 作为全新独立 Reviewer，只读检查实现、测试、范围和证据，输出 `PASS/FAIL + Critical/Important/Minor findings`；默认不修改生产代码、测试、migration 或文档。
+5. FAIL 时 Codex 只修复 Reviewer 指出的实际问题，再由 Claude Code 复审；Critical/Important 未清零不能继续。
+6. PASS 后才允许进入下一个 Task。
 
----
+## Task 0: Product Pivot Documentation & Baseline Lock
 
-## Task 1: 初始化仓库、工具链与标准脚本
+**Goal:** 把新产品交互、继承边界、运行规范和 Task 计划锁定为可审阅文档，并证明本轮没有 Product Pivot 生产代码变更。
+
+**Scope:** 新建 Product Pivot Spec；精确归档旧 Task；更新 `AGENTS.md` 的使命、真相源、Product Pivot 不变量、Agent 分工和 E2E 缺口；更新 `PRODUCTION.md` 的运行真相源、Ready、故障矩阵和演示检查表；重写当前 Task 0–8 计划。
+
+**Explicit non-scope:** 不改 `src/`、`app/`、`components/`、`tests/`、`drizzle/`、`scripts/`、`package.json`、`pnpm-lock.yaml`；不实现 Swipe、regenerate、Mixing redesign、Feedback UI、final photo、状态机或 Provider。
 
 **Files:**
 
-- Preserve: `AGENTS.md`, `PRODUCTION.md`, `Task.md`, `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`
-- Create: `package.json`, `pnpm-lock.yaml`, `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `.prettierrc.json`, `.prettierignore`, `.gitignore`, `.nvmrc`, `.node-version`, `.env.example`
-- Create: `app/layout.tsx`, `app/page.tsx`, `app/globals.css`, `app/api/health/route.ts`
-- Create: `vitest.config.ts`, `vitest.setup.ts`, `playwright.config.ts`
-- Create: `src/config/env.ts`, `src/infrastructure/health/get-health.ts`
-- Test: `tests/unit/config/env.test.ts`, `tests/unit/infrastructure/health/get-health.test.ts`
+- Create: `docs/superpowers/specs/2026-08-28-guikesong-yqz-product-pivot.md`
+- Create exact archive: `docs/baseline/Task-frozen-pre-pivot.md`
+- Modify: `AGENTS.md`
+- Modify: `PRODUCTION.md`
+- Replace: `Task.md`
+- Preserve unchanged: `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`, `docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
 
-**Required package scripts:**
+**Tests:**
 
-```json
-{
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start",
-  "lint": "eslint .",
-  "format": "prettier --write .",
-  "format:check": "prettier --check .",
-  "typecheck": "tsc --noEmit",
-  "test": "vitest run",
-  "test:watch": "vitest",
-  "test:e2e": "playwright test",
-  "db:generate": "drizzle-kit generate",
-  "db:migrate": "tsx scripts/db-migrate.ts",
-  "db:seed": "tsx scripts/db-seed.ts"
-}
-```
+- `git diff --check`
+- If Markdown is included by the repository formatter, `pnpm format:check`
+- Read-only scope audit for production paths, migration, package and lockfile
 
 **Steps:**
 
-- [x] 确认 Node 24 与 Corepack；若不是 Git 仓库，执行 `git init`。
-- [x] 在独立临时子目录运行以下命令，只把新脚手架文件合并到根目录，不覆盖四份文档；删除的只能是刚创建并核对过的临时目录：
+- [x] 核对 `HEAD`、branch、status、package.json 和 app/components/src/tests/drizzle 结构。
+- [x] 将旧 `Task.md` 原样复制到 `docs/baseline/Task-frozen-pre-pivot.md`，用 SHA-256 证明字节一致。
+- [x] 写 Product Pivot Spec，并只覆盖 Recipe Selection、Reject-all、Mixing、Feedback、Final drink、状态、范围和已知缺口。
+- [x] 更新 AGENTS、PRODUCTION 与当前执行计划，保持继承架构和安全规则不被静默改写。
+- [x] 运行文档格式、范围和一致性验证。
+- [x] 提交文档变更，停止等待独立 Reviewer。
 
-```bash
-pnpm dlx create-next-app@16 scaffold-tmp \
-  --ts --tailwind --eslint --app --no-src-dir \
-  --import-alias "@/*" --use-pnpm --turbopack
-```
-- [x] 安装冻结依赖：`zod drizzle-orm better-sqlite3 sharp openai`；开发依赖：`drizzle-kit @types/better-sqlite3 tsx vitest @vitest/coverage-v8 jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event @playwright/test prettier prettier-plugin-tailwindcss`。
-- [x] 运行 `pnpm exec playwright install chromium` 安装 E2E 浏览器；CI/新机器也必须显式执行，不能依赖开发机缓存。
-- [x] 在 `package.json` 固定 `packageManager` 和 Node engines；在 `.nvmrc`、`.node-version` 写 `24`。
-- [x] 在 `.gitignore` 加入 `.env*`（保留 `.env.example`）、`data/`、Playwright/Vitest 产物。
-- [x] 先创建 `env.test.ts`，断言缺少必需变量时解析失败、`AI_MODE=fallback` 不要求密钥、`AI_MODE=qwen` 要求密钥；运行 `pnpm vitest run tests/unit/config/env.test.ts`，确认因模块不存在而失败。
-- [x] 实现 `src/config/env.ts` 的 Zod discriminated union，不输出变量值；重跑测试至通过。
-- [x] 先写 health 单测，断言仅返回 `status/checks/version`，且响应 JSON 不含 `DATABASE_PATH` 或 `DASHSCOPE_API_KEY`；确认失败。
-- [x] 实现纯函数 `getHealthSnapshot(dependencies)` 和薄 Route Handler；Provider 健康只报告模式，不做付费调用。
-- [x] 创建最小移动端首页，主按钮创建会话的行为留到 Task 6；当前只说明项目状态。
-- [x] 运行：
+**Acceptance:** 新 Spec 成为产品交互/MVP 最高真相源；旧 Task 完整归档；根 Task 不再要求旧 Task 14–17 或旧 Task 13C；四份当前文档明确同一 Product Pivot；生产代码、测试、migration、package 和 lockfile 无改动。
 
-```bash
-pnpm lint
-pnpm format:check
-pnpm typecheck
-pnpm test
-pnpm build
-```
+**Verification:** `git diff --check` 通过；归档文件与修改前 `Task.md` 哈希一致；`git diff --stat`、`git status` 和允许路径审计均符合范围。完整 E2E、手机和 Provider 验证留后续 Task。
 
-**Acceptance:** 五个命令全绿；`GET /api/health` 不泄露秘密；锁文件存在；四份文档未被脚手架覆盖。
+**Commit message:** `docs: lock Guikesong YQZ product pivot baseline`
 
-**Commit:** `chore: initialize nextjs toolchain and health contract`
+**Reviewer gate:** Claude Code 独立只读审查本 Task；输出 `PASS/FAIL + Critical/Important/Minor findings`。本 Task PASS 前不得开始 Task 1。
 
----
+## Task 1: Visual System & Mobile Shell
 
-## Task 2: 定义领域 Schema 与共享错误契约
+**Goal:** 建立新版手机优先视觉系统和状态驱动 Mobile Shell，让每个页面一屏只有一个主动作，并为单卡、Stepper、满意优先反馈提供一致容器。
+
+**Scope:** 颜色、排版、间距、触控尺寸、响应式单列布局、进度头、底部主操作栏、加载/错误/恢复状态和状态到页面的壳层映射；保留既有服务端渲染与客户端 SessionShell 结构。
+
+**Explicit non-scope:** 不改任何 Recipe/Feedback/Adjustment/图片业务合同；不实现 Swipe、换一批、Mixing Stepper 细节、final photo 或新的 SessionState；不新增 React、npm 或其他前端框架。
 
 **Files:**
 
-- Create: `src/domain/preferences.ts`
-- Create: `src/domain/session.ts`
-- Create: `src/domain/ingredient.ts`
-- Create: `src/domain/recipe.ts`
-- Create: `src/domain/feedback.ts`
-- Create: `src/domain/safety.ts`
-- Create: `src/domain/api.ts`
-- Create: `src/domain/id.ts`
-- Test: `tests/unit/domain/*.test.ts`
-- Test fixtures: `tests/fixtures/domain.ts`
+- Modify: `app/globals.css`, `app/layout.tsx`
+- Modify: `components/session/session-shell.tsx`, `components/session/progress-header.tsx`, `components/session/fixed-action-bar.tsx`
+- Modify only for shell wiring: `components/preferences/preferences-screen.tsx`, `components/scan/camera-screen.tsx`, `components/ingredients/ingredient-confirmation-screen.tsx`
+- Test: `tests/components/preferences/session-shell.test.tsx`, `tests/components/preferences/preferences-screen.test.tsx`, `tests/components/scan/camera-screen.test.tsx`
+- Create if needed: `tests/components/session/mobile-shell.test.tsx`
 
-**Public contracts:**
-
-```ts
-type TasteLevel = 1 | 2 | 3 | 4 | 5;
-
-interface TasteProfile {
-  sweetness: TasteLevel;
-  acidity: TasteLevel;
-  alcoholIntensity: TasteLevel;
-  body: TasteLevel;
-}
-
-type SessionState =
-  | "PREFERENCES" | "SCAN" | "CONFIRM" | "READY"
-  | "RECIPE_SELECTION" | "MIXING" | "FEEDBACK"
-  | "ADJUSTMENT" | "COMPLETED";
-
-type IngredientCategory =
-  | "spirit" | "mixer" | "tea" | "fruit" | "sweetener"
-  | "herb" | "ice" | "energy_drink" | "medicine"
-  | "non_food" | "unknown";
-
-type RecipeStrategy = "A_CONSERVATIVE" | "B_CREATIVE" | "C_UPGRADE";
-type SafetyLevel = "ALLOW" | "WARN" | "BLOCK";
-type FeedbackDelta = -2 | -1 | 0 | 1 | 2;
-```
+**Tests:** RTL 断言手机单列、主动作可达、加载/错误/重试、已有状态恢复；已有偏好/拍照/确认组件测试；`pnpm lint`、`pnpm format:check`、`pnpm typecheck`。
 
 **Steps:**
 
-- [x] 为每个 Schema 先写合法最小样本和至少两个错误样本；确认因模块不存在而失败。
-- [x] 实现 `TasteProfileSchema`，所有字段必须是 `1..5` 整数；禁止 Zod 静默强制字符串转数字。
-- [x] 实现不可预测 ID 的品牌类型与解析：`SessionId`, `RequestId`, `RecipeId`。生成使用 `crypto.randomUUID()`，边界只接收 UUID。
-- [x] 实现 `DetectedIngredientSchema`：保留 `rawName` 与 `canonicalName`，酒类必须允许 `abv: null`，但 `confirmed` 独立表示人工确认。
-- [x] 实现 `RecipeCandidateSchema`：材料用量、步骤、预计 ABV、差异说明、安全状态、实验性标记、最多 2 个缺失材料。
-- [x] 实现 `RecipeCandidateSetSchema`，用 `superRefine` 强制恰好 A/B/C 各一套且 ID 不重复。
-- [x] 实现 `FeedbackSchema`：评分 `1..5`、accepted、四个 delta、notes 长度限制、finalImageId 可选。
-- [x] 实现 `SuccessEnvelopeSchema` 和 `ErrorEnvelopeSchema`；错误码是稳定英文枚举，message 可本地化。
-- [x] 用 `tests/fixtures/domain.ts` 提供唯一合法 fixture 工厂，禁止不同测试各造一套漂移数据。
-- [x] 运行 `pnpm vitest run tests/unit/domain && pnpm typecheck`。
+- [ ] 先补视觉契约测试：390×844 视口下 shell、主 CTA 和错误恢复语义。
+- [ ] 运行目标测试确认 RED，记录失败断言。
+- [ ] 实现最小 tokens、布局和壳层，不改变 API payload。
+- [ ] 运行组件测试及质量门禁，修正真实失败。
+- [ ] 提交后交 Claude Code 独立 Review。
 
-**Acceptance:** 所有外部数据类型都有运行时 Schema；错误 JSON 会被拒绝；业务代码不需要 `any`。
+**Acceptance:** PREFERENCES/SCAN/CONFIRM/READY/RECIPE_SELECTION/MIXING 等既有状态共享可读的手机壳；按钮触控区域达到项目既定要求；加载、失败、重试和刷新恢复可见；业务测试合同不变。
 
-**Commit:** `feat: define validated domain contracts`
+**Verification:** 定向组件测试、`pnpm lint`、`pnpm format:check`、`pnpm typecheck` 和必要的真实浏览器截图/检查均有输出。
 
----
+**Commit message:** `feat: establish product pivot mobile shell`
 
-## Task 3: 实现会话状态机
+**Reviewer gate:** Codex commit 后由 Claude Code 独立只读审查；PASS 后才进入 Task 2。
+
+## Task 2: Recipe Swipe Deck
+
+**Goal:** 在不改变初次生成后端合同的前提下，把三套候选改成按 recommendation ranking 逐张浏览的单卡 Swipe Deck。
+
+**Scope:** 复用当前 Recipe Set 三张数据；首张显示推荐排序第一名；左滑进入本批下一张；右滑调用现有 `selectRecipe`；`WARN` 继续显式确认；本批内不产生任何新的 Provider 调用。
+
+**Explicit non-scope:** 不实现 regenerate/换一批；不修改 `generate()`、RecipeCandidateSet、Safety、Repository、migration 或状态机；不把左滑写成 `accepted=false` 或 Feedback；不展示三张卡同时作为主交互。
 
 **Files:**
 
-- Create: `src/workflow/session-machine.ts`
-- Test: `tests/unit/workflow/session-machine.test.ts`
+- Modify: `components/recipes/recipe-selection-screen.tsx`, `components/recipes/recipe-card.tsx`, `components/session/session-shell.tsx`
+- Modify only if required by existing method typing: `src/infrastructure/http/session-client.ts`
+- Test: `tests/components/recipes/recipe-selection-screen.test.tsx`
+- Create if needed: `tests/components/recipes/recipe-swipe-deck.test.tsx`
+- Preserve backend contracts: `src/application/generate-recipe-set.ts`, `src/application/select-recipe.ts`, `app/api/sessions/[sessionId]/recipes/route.ts`, `app/api/sessions/[sessionId]/selection/route.ts`
 
-**Public contract:**
-
-```ts
-interface TransitionContext {
-  hasPreferences: boolean;
-  hasOverviewImage: boolean;
-  allIngredientsConfirmed: boolean;
-  alcoholAbvConfirmed: boolean;
-  hasRecipeSet: boolean;
-  hasSelectedRecipe: boolean;
-  currentStep: number | null;
-  totalSteps: number | null;
-  hasFeedback: boolean;
-}
-
-function transition(
-  from: SessionState,
-  event: SessionEvent,
-  context: TransitionContext,
-): SessionState;
-```
+**Tests:** 初始顺序为 ranking 第一名；始终只有一张可见卡；左滑只更新本地 deck index 且 client spy 无调用；右滑只调用 `selectRecipe`；WARN 未确认不能右滑；最后一张左滑显示“换一批”入口但不调用 regenerate。
 
 **Steps:**
 
-- [x] 表驱动测试所有规格中的合法转移。
-- [x] 为非法跳转写测试：`PREFERENCES → MIXING`、未确认材料进入 READY、ABV 未确认进入生成、未选配方进入 MIXING。
-- [x] 运行测试，确认失败原因是 `transition` 不存在。
-- [x] 实现显式转移表与 Guard；非法转移抛出稳定 `INVALID_TRANSITION`，错误包含 from/event，不包含敏感数据。
-- [x] 测试 `MIXING` 当前步骤的前进/后退边界，第一步不能再退，最后一步完成后才进入 FEEDBACK。
-- [x] 测试 `ADJUSTMENT → MIXING` 只在已选当前反馈生成的下一版本时允许，或 `ADJUSTMENT → COMPLETED` 结束；不绑定具体版本号。
-- [x] 运行 `pnpm vitest run tests/unit/workflow/session-machine.test.ts && pnpm typecheck`。
+- [ ] 从当前 ranking 输出和组件行为写 RED 测试，禁止测试依赖 A/B/C 顺序。
+- [ ] 运行定向组件测试确认 RED。
+- [ ] 实现最小本地 deck cursor、手势/键盘等价操作和右滑选择。
+- [ ] 运行组件测试、全量 Vitest 和质量门禁。
+- [ ] 提交并等待独立 Review；不进入 Task 3 直到 PASS。
 
-**Acceptance:** 每个状态和事件均有测试；不存在页面自行拼字符串推进状态的需要。
+**Acceptance:** 单卡首屏是推荐方案；左滑只浏览当前 batch；右滑成功进入现有 MIXING；三张全左滑后只有用户可见的“换一批”入口，没有隐式生成。
 
-**Commit:** `feat: add guarded session state machine`
+**Verification:** 定向 RTL、`pnpm test`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck`；至少一次持久化真实浏览器路径证明 refresh 后仍回到可恢复 Recipe Selection。
 
----
+**Commit message:** `feat: add ranked recipe swipe deck`
 
-## Task 4: 实现确定性 Safety 引擎
+**Reviewer gate:** Claude Code 独立只读审查卡片语义、无后端副作用、可访问操作和范围；PASS 后才进入 Task 3。
+
+## Task 3: Reject All → Regenerate Batch
+
+**Goal:** 实现三张候选全部左滑后，只有用户主动点击“换一批”才触发新三卡生成，并让新批次重新经过完整安全和推荐管线。
+
+**Scope:** 调查现有 `generateRecipeSet` 是否能在 `RECIPE_SELECTION` 再调用；实现被用户选定的 regenerate API 方案、requestId/expectedVersion 幂等并发、批次替换/保留策略、错误恢复和单卡 deck 重置。
+
+**Explicit non-scope:** 不把左滑变成 API；不每次左滑调用模型；不生成单卡；不修改 Provider `generate()` 使其返回一张；不新增 SessionState；不实现 Feedback 或 Mixing redesign。
 
 **Files:**
 
-- Create: `src/safety/types.ts`
-- Create: `src/safety/rules/catalog.ts`
-- Create: `src/safety/rules/alcohol-energy.ts`
-- Create: `src/safety/rules/non-food.ts`
-- Create: `src/safety/rules/unknown-abv.ts`
-- Create: `src/safety/rules/allergen.ts`
-- Create: `src/safety/rules/experimental.ts`
-- Create: `src/safety/calculate-alcohol.ts`
-- Create: `src/safety/evaluate-safety.ts`
-- Test: `tests/unit/safety/*.test.ts`
+- Investigate/likely modify: `src/application/generate-recipe-set.ts`, `src/application/get-recipe-set.ts`, `src/repositories/recipe-repository.ts`, `src/infrastructure/repositories/drizzle-recipe-repository.ts`
+- Investigate/likely modify: `app/api/sessions/[sessionId]/recipes/route.ts`, `src/infrastructure/routes/recipe-route-dependencies.ts`
+- Modify: `components/recipes/recipe-selection-screen.tsx`, `components/session/session-shell.tsx`, `src/infrastructure/http/session-client.ts`
+- Test: `tests/integration/application/generate-recipe-set.test.ts`, `tests/integration/api/recipe-routes.test.ts`, `tests/components/recipes/recipe-selection-screen.test.tsx`
+- Create if needed: `src/application/regenerate-recipe-set.ts`, `app/api/sessions/[sessionId]/recipes/regenerate/route.ts`, `tests/integration/application/regenerate-recipe-set.test.ts`, `tests/integration/api/regenerate-recipe-route.test.ts`
+- Do not modify: `drizzle/` migrations unless a separately approved schema change is added to the product plan; default choice is no migration.
 
-**Public contract:**
+**Tests:** 新动作只在三张全拒绝后由点击触发；每次返回恰好 A/B/C；新批次重跑 Zod、Safety、BLOCK repair/fallback、ranking；失败保留 RECIPE_SELECTION 和可恢复旧数据；重复 requestId 不重复生成；旧 expectedVersion 返回冲突；左滑本身零 Provider/API 调用。
 
-```ts
-interface SafetyDecision {
-  level: "ALLOW" | "WARN" | "BLOCK";
-  estimatedFinalAbv: number | null;
-  pureAlcoholMl: number | null;
-  hits: Array<{
-    ruleId: string;
-    ruleVersion: number;
-    level: SafetyLevel;
-    reason: string;
-    alternative?: string;
-  }>;
-}
+**API decision checkpoint（必须在实现前记录并取得用户决定）：**
 
-function evaluateSafety(input: SafetyInput): SafetyDecision;
-```
+1. **方案 A：扩展既有 `POST /api/sessions/{sessionId}/recipes`。** 优点是复用 `generateRecipeSet` 的安全、幂等和路由依赖；代价是需要明确区分 READY 首次生成与 RECIPE_SELECTION 换批，定义旧批次替换/历史审计语义，避免复用旧 `hasRecipeSet=false` Guard 造成回归。
+2. **方案 B：新增 `POST /api/sessions/{sessionId}/recipes/regenerate` 和独立 Application use case。** 优点是语义、审计和状态 Guard 独立清楚；代价是新增 Route/客户端合同，并要复用而不是复制现有 Safety、Provider、租约和持久化逻辑。
+
+在没有用户决定前，Codex 只完成调查、失败测试和候选方案记录，不实现 A 或 B。无论最终选择哪一方案，都不得改变 `generate()` 一批三卡的合同。
 
 **Steps:**
 
-- [x] 先为酒精计算写表驱动测试：`pureAlcoholMl = volumeMl * abv / 100`；`finalAbv = totalPureAlcoholMl / totalDrinkMl * 100`；空杯、负数、未知 ABV 拒绝或返回不可计算。
-- [x] 写规则测试并确认失败：酒精 + 能量饮料 `BLOCK`；药物/非食品/未知化学品 `BLOCK`；酒类 ABV 未确认 `BLOCK`；过敏原 `WARN`；奇怪但无证据组合 `WARN + experimental`；普通已知组合 `ALLOW`。
-- [x] 实现 `SafetyRule` 版本字段和静态 catalog；每条规则包含可读原因、替代方案和证据引用。
-- [x] 实现最严重级别聚合顺序 `BLOCK > WARN > ALLOW`，命中列表保持稳定排序。
-- [x] 实现纯函数酒精计算；用十进制容差测试，禁止把估算值显示成医学保证。
-- [x] 加回归测试：模型候选自带 `ALLOW` 时仍重新计算；传入 `safetyLevel` 不影响引擎结论。
-- [x] 加规则完整性测试：ruleId 唯一、版本为正整数、BLOCK 必须有 alternative、evidence 非空。
-- [x] 运行 `pnpm vitest run tests/unit/safety && pnpm typecheck`。
+- [ ] 完成 `generateRecipeSet`、Recipe Repository、route、幂等和 state guard 调查，写出当前不可直接复用点。
+- [ ] 记录方案 A/B 的选择、替代方案和后果；取得用户最终决定。
+- [ ] 先写 RED：三张全拒绝后点击触发、重复请求、版本冲突、Safety-invalid 候选和 Provider 失败。
+- [ ] 运行定向测试确认失败原因对应 regenerate。
+- [ ] 实现最小选定 API，保证外部 Provider 调用不持有长数据库事务。
+- [ ] 运行应用/API/组件测试和全量门禁，提交并独立 Review。
 
-**Acceptance:** Safety 无 Provider/Next/数据库依赖；`BLOCK` 无 override 参数；规则变更可追溯。
+**Acceptance:** 三张全拒绝不会自动生成；主动点击才产生一次新的 3-card batch；新批次完成 Zod/Safety/ranking；成功后仍在 RECIPE_SELECTION，直到右滑；失败可重试且不丢当前会话；无新状态、无 migration。
 
-**Commit:** `feat: implement deterministic safety engine`
+**Verification:** API/application/组件定向测试、`pnpm test`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck`；记录实际采用的 API 方案和完整 requestId/expectedVersion 证据。
 
----
+**Commit message:** `feat: add explicit recipe batch regeneration`
 
-## Task 5: 建立 Drizzle Schema、迁移与 Repository
+**Reviewer gate:** Claude Code 独立审查 API 决策、批次持久化、Safety、幂等并发和“左滑无副作用”；Critical/Important 清零并 PASS 后才进入 Task 4。
+
+## Task 4: Mixing Stepper Redesign
+
+**Goal:** 将接受后的调制体验改成纵向 Step Index/Stepper，同时保留 currentStep、前进、后退和 refresh 恢复。
+
+**Scope:** Mixing UI 的步骤索引、当前步骤内容、用量、前进/后退、错误和恢复；复用现有 `advanceMixing` 与 session snapshot；新版流程不显示、不要求、不上传 checkpoint photo。
+
+**Explicit non-scope:** 不删除 `mixing_step`/checkpoint 数据、Repository、旧 route 或 migration；不新增 `FINAL_PHOTO`；不修改 Safety、Recipe、Feedback 后端；不把客户端 state 当成持久化事实。
 
 **Files:**
 
-- Create: `drizzle.config.ts`
-- Create: `src/infrastructure/db/schema.ts`
-- Create: `src/infrastructure/db/client.ts`
-- Create: `src/infrastructure/db/transaction.ts`
-- Create: `src/repositories/session-repository.ts`
-- Create: `src/repositories/recipe-repository.ts`
-- Create: `src/repositories/feedback-repository.ts`
-- Create: `src/infrastructure/repositories/drizzle-*.ts`
-- Create: `scripts/db-migrate.ts`, `scripts/db-seed.ts`
-- Generate: `drizzle/` migration files
-- Test: `tests/integration/repositories/*.test.ts`
-- Test helper: `tests/helpers/test-database.ts`
+- Modify: `components/mixing/mixing-screen.tsx`, `components/session/session-shell.tsx`
+- Modify only if necessary for existing client types: `src/infrastructure/http/session-client.ts`
+- Preserve: `src/application/advance-mixing.ts`, `app/api/sessions/[sessionId]/mixing/advance/route.ts`, `drizzle/`
+- Test: `tests/components/mixing/mixing-screen.test.tsx`, `tests/integration/application/advance-mixing.test.ts`, `tests/integration/api/mixing-routes.test.ts`
+- Retire from rendered path only; do not delete: `tests/components/mixing/mixing-photo-checkpoint.test.tsx` and legacy checkpoint implementation files
 
-**Required tables:** `sessions`, `images`, `ingredients`, `recipe_sets`, `recipes`, `safety_decisions`, `feedback`, `decision_events`, `experiment_memories`, `idempotency_records`。
+**Tests:** 垂直 Stepper 显示当前/已完成/待完成；前进和后退调用既有 API；第一步不能后退；最后一步进入 FEEDBACK；页面不渲染 checkpoint photo 入口；模拟 refresh 使用服务端 currentStep 恢复；网络/409 不偷偷推进。
 
 **Steps:**
 
-- [x] 先写 repository contract tests，使用每个测试独立临时 SQLite；确认因实现不存在而失败。
-- [x] 定义 Drizzle Schema、外键、唯一约束和索引：`idempotency_records(session_id, request_id)` 唯一；recipe version 与 parent 可追踪。
-- [x] JSON 字段读写都通过 Task 2 的 Zod Schema，不用 `as SomeType` 硬断言。
-- [x] 实现 `withTransaction`，保证配方批次、三配方、安全决策、事件和会话版本原子写入。
-- [x] 写失败注入测试：中间 insert 抛错后，所有表和 session version 均不变化。
-- [x] 实现 migration 与 seed；seed 只包含 fallback 材料类别、灵感和配方模板。
-- [x] 从全新临时目录运行迁移两次，第二次幂等；检查外键开启、busy timeout 和 WAL 配置。
-- [x] 运行 `pnpm db:generate`，审阅 SQL，再运行 repository tests。
+- [ ] 先写 RED 组件和恢复测试，锁定旧 checkpoint 不再是 UI 前置条件。
+- [ ] 运行定向测试确认 RED。
+- [ ] 实现最小 Stepper 和错误恢复。
+- [ ] 运行组件、应用、API 和全量门禁。
+- [ ] 提交后由 Claude Code 独立 Review。
 
-**Acceptance:** 空 DB 可初始化；事务失败不产生半成品；测试不触碰 `data/app.db`。
+**Acceptance:** 用户可看到清晰纵向步骤、当前内容和前后动作；refresh 保持 currentStep；任何 Mixing 步骤都不要求过程照；旧数据库/migration 完整保留。
 
-**Commit:** `feat: add sqlite schema migrations and repositories`
+**Verification:** 定向 Mixing 测试、`pnpm test`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck`，以及真实浏览器 refresh 路径。
 
----
+**Commit message:** `feat: redesign mixing as resumable stepper`
 
-## Task 6: 会话、偏好与幂等 API 纵切
+**Reviewer gate:** Claude Code 独立审查状态恢复、边界、旧数据兼容和无 checkpoint 强制路径；PASS 后才进入 Task 5。
+
+## Task 5: Satisfaction-first Feedback & Adjustment UI
+
+**Goal:** 在 FEEDBACK 首先询问“满意吗？”，只有“还想调整”才展示四维相对反馈，并接通已完成的 Vn+1 后端闭环。
+
+**Scope:** 满意/还想调整首屏、四维 `-2..+2` 调整、可选备注、保存反馈、生成唯一 proposal、接受 proposal 后重新 MIXING；显示版本和 Safety 摘要，处理错误/重试/409。
+
+**Explicit non-scope:** 不新增 Feedback/Adjustment 数据模型或 SessionState；不做三张全拒绝原因调查；不修改 13A/13B 后端合同，除非测试证明现有 UI adapter 无法合法调用且先记录决策；不实现 final photo 收尾细节。
 
 **Files:**
 
-- Create: `src/application/create-session.ts`
-- Create: `src/application/get-session.ts`
-- Create: `src/application/save-preferences.ts`
-- Create: `src/application/idempotency.ts`
-- Create: `src/application/unit-of-work.ts`
-- Create: `app/api/sessions/route.ts`
-- Create: `app/api/sessions/[sessionId]/route.ts`
-- Create: `app/api/sessions/[sessionId]/preferences/route.ts`
-- Create: `src/infrastructure/http/envelopes.ts`
-- Test: `tests/integration/application/session-use-cases.test.ts`
-- Test: `tests/integration/api/session-routes.test.ts`
+- Create: `components/feedback/satisfaction-screen.tsx`, `components/feedback/adjustment-screen.tsx`
+- Modify: `components/session/session-shell.tsx`, `src/infrastructure/http/session-client.ts`
+- Reuse: `src/application/save-feedback.ts`, `src/application/generate-adjustment.ts`, `src/application/accept-adjustment.ts`, `src/application/get-current-recipe.ts`, `src/application/get-recipe-version-chain.ts`
+- Reuse routes: `app/api/sessions/[sessionId]/feedback/route.ts`, `app/api/sessions/[sessionId]/adjustments/route.ts`, `app/api/sessions/[sessionId]/accept-adjustment/route.ts`
+- Test: `tests/integration/application/feedback-adjustment.test.ts`, `tests/integration/api/task-13-feedback-routes.test.ts`
+- Create: `tests/components/feedback/satisfaction-screen.test.tsx`, `tests/components/feedback/adjustment-screen.test.tsx`
 
-**API examples:**
-
-```json
-POST /api/sessions
-{"requestId":"<uuid>"}
-
-PUT /api/sessions/<id>/preferences
-{
-  "requestId":"<uuid>",
-  "expectedVersion":0,
-  "preferences":{"sweetness":3,"acidity":3,"alcoholIntensity":2,"body":2}
-}
-```
+**Tests:** FEEDBACK 首屏只显示满意/还想调整；满意不先显示四维滑杆；不满意显示四维和备注；保存 accepted=true/false 对应合法状态；只生成一张 Vn+1；proposal 未接受前 current recipe 不替换；接受后 currentStep 重置并进入 MIXING；V2/V3 版本链可持续。
 
 **Steps:**
 
-- [x] 先写用例测试：创建返回随机 UUID 与 `PREFERENCES/version 0`；保存偏好推进 `SCAN/version 1`。
-- [x] 写重复 `requestId` 测试，第二次必须返回相同响应且版本不再增加。
-- [x] 写旧 `expectedVersion` 测试，返回领域冲突且不写数据。
-- [x] 实现应用用例，不依赖 Request/Response。
-- [x] 写 Route 测试：非法 JSON `400`，未知会话 `404`，冲突 `409`，成功信封符合 Task 2。
-- [x] 实现薄 Route Handler 和统一错误映射；500 不返回 stack。
-- [x] GET 会话返回恢复页面所需的单一快照，不返回数据库路径、Prompt 或密钥。
-- [x] 运行会话用例、API 测试和 build。
+- [ ] 先补 RED 组件和集成测试，覆盖满意优先与 Vn+1 绑定。
+- [ ] 运行定向测试确认 RED。
+- [ ] 实现 UI adapter，复用既有后端和错误/幂等恢复。
+- [ ] 运行定向测试、全量 Vitest 和质量门禁。
+- [ ] 提交并等待独立 Review。
 
-**Acceptance:** 首个真实纵切完成；幂等、版本和状态在同一事务；M1 后端基础成立。
+**Acceptance:** 满意不被迫填写详细 feedback；不满意才出现四维调整；Vn+1 只针对当前实际配方生成并经既有 Safety；接受后回到 MIXING；不能通过 UI 绕过状态机或 BLOCK。
 
-**Commit:** `feat: add resumable session and preferences api`
+**Verification:** 组件、应用、API 测试，`pnpm test`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck`，以及刷新后 FEEDBACK/ADJUSTMENT 恢复路径。
 
----
+**Commit message:** `feat: add satisfaction first feedback loop`
 
-## Task 7: 安全图片上传与标准化
+**Reviewer gate:** Claude Code 独立审查 accepted 语义、反馈版本链、proposal/current 分离、幂等并发和 Safety；PASS 后才进入 Task 6。
+
+## Task 6: Optional Final Drink Photo & Completed UI
+
+**Goal:** 在满意路径中提供可选 final drink 拍摄，并保证拍摄成功或明确跳过都能完成会话。
+
+**Scope:** 满意后的 final drink 邀请、相机/文件选择、预览、上传失败重试、跳过、Completed 页面和完成状态恢复；复用 `final_drink` image role、现有上传安全和 Feedback/complete 后端能力。
+
+**Explicit non-scope:** 不新增 `FINAL_PHOTO` SessionState；不把 final photo 设为必填；不实现分享、海报、社交、质量/医学判断；不删除旧 checkpoint image 数据。
 
 **Files:**
 
-- Create: `src/providers/image-store.ts`
-- Create: `src/infrastructure/uploads/validate-image.ts`
-- Create: `src/infrastructure/uploads/normalize-image.ts`
-- Create: `src/infrastructure/uploads/local-image-store.ts`
-- Create: `src/application/upload-session-image.ts`
-- Create: `app/api/sessions/[sessionId]/images/route.ts`
-- Test assets: `tests/fixtures/images/valid.jpg`, `valid.png`, `fake.jpg`, `oversized-dimensions.png`
-- Test: `tests/unit/uploads/*.test.ts`
-- Test: `tests/integration/application/upload-session-image.test.ts`
+- Create: `components/feedback/final-drink-photo.tsx`, `components/session/completed-screen.tsx`
+- Modify: `components/session/session-shell.tsx`, `src/infrastructure/http/session-client.ts`
+- Reuse: `app/api/sessions/[sessionId]/images/route.ts`, `src/application/upload-session-image.ts`, `src/application/save-feedback.ts`, `src/application/complete-session.ts`
+- Test: `tests/components/feedback/final-drink-photo.test.tsx`, `tests/components/session/completed-screen.test.tsx`
+- Extend: `tests/integration/api/task-13-feedback-routes.test.ts`, `tests/integration/application/feedback-adjustment.test.ts`
+
+**Tests:** final drink 上传成功关联 `finalImageId`；上传失败可以重试或跳过；跳过保存 null 仍进入 COMPLETED；满意带照和满意无照两条路径都可 refresh 恢复到 Completed；final photo 失败不破坏反馈记录；不出现新状态。
 
 **Steps:**
 
-- [x] 先写 magic-byte、MIME、扩展名、字节上限、像素上限测试；不能只 mock `file.type`。
-- [x] 写路径穿越文件名测试，传入 `../../x.jpg` 后保存键仍必须由服务端 UUID 生成。
-- [x] 实现流式/有界读取，先限字节再交给 sharp；捕获解码错误并映射 422。
-- [x] 实现 EXIF 方向修正、元数据移除、长边 2048、统一 JPEG；测试输出尺寸和 MIME。
-- [x] 实现 `LocalImageStore`，对象键格式 `{sessionId}/{role}-{imageId}.jpg`，绝对路径不出接口。
-- [x] 在应用事务中保存图片元数据后再推进相应状态；文件成功而 DB 失败时补偿删除本次新文件。
-- [x] Route 接受 multipart/form-data；413、415、422 使用稳定错误码。
-- [x] HEIC 暂时返回可操作的兼容提示；不要偷偷加入未验证转换库。
-- [x] 运行上传单元、集成测试与 `pnpm build`。
+- [ ] 先写 RED 组件/集成测试，覆盖拍照、跳过、失败恢复和 Completed。
+- [ ] 运行定向测试确认 RED。
+- [ ] 实现最小 final drink UI 和完成页面。
+- [ ] 运行全量测试、质量门禁和真实浏览器两条满意路径。
+- [ ] 提交后由 Claude Code 独立 Review。
 
-**Acceptance:** 伪造/超大/损坏图被拒绝；正常图标准化；无路径遍历、孤立文件或公开静态路径。
+**Acceptance:** 用户满意后可拍或跳过 final drink；上传失败仍有跳过出口；两条路径都合法进入 `COMPLETED`；没有 `FINAL_PHOTO` 状态或分享入口。
 
-**Commit:** `feat: add bounded image upload pipeline`
+**Verification:** 定向组件/API/应用测试、`pnpm test`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck` 和持久化浏览器路径。
 
----
+**Commit message:** `feat: add optional final drink completion flow`
 
-## Task 8: 视觉 Provider、半开放识别与材料确认
+**Reviewer gate:** Claude Code 独立审查 finalImageId 可选性、跳过恢复、完成状态和范围；PASS 后才进入 Task 7。
+
+## Task 7: Full Recovery + Playwright E2E
+
+**Goal:** 真正建立可执行 Playwright E2E，覆盖 Product Pivot 完整闭环、恢复和关键错误路径；从此 `pnpm test:e2e` 重新成为阻塞发布门禁。
+
+**Scope:** fallback Provider 下的真实浏览器流程：偏好 → 桌面拍照 → 识别确认 → 三卡生成 → 单卡 Swipe → 三张全拒绝 → 主动换批 → 右滑 → Mixing Stepper → refresh currentStep → 满意拍 final drink/跳过；另覆盖不满意 → V2 → 接受 → MIXING → 再次满意。覆盖重复请求、网络响应丢失、regenerate 失败、final photo 上传失败后跳过。
+
+**Explicit non-scope:** 不把组件测试冒充 E2E；不跳过 regenerate 或反馈；不接真实 Qwen 或真实手机硬件；不修改 migration；不接受 `No tests found` 作为 Task 7 验收结果。
 
 **Files:**
 
-- Create: `src/providers/vision-provider.ts`
-- Create: `src/infrastructure/providers/fallback-vision-provider.ts`
-- Create: `src/infrastructure/providers/qwen-vision-provider.ts`
-- Create: `src/agent/prompts/recognize-ingredients.ts`
-- Create: `src/application/recognize-ingredients.ts`
-- Create: `src/application/confirm-ingredients.ts`
-- Create: `app/api/sessions/[sessionId]/recognition/route.ts`
-- Create: `app/api/sessions/[sessionId]/ingredients/route.ts`
-- Test: `tests/contract/providers/vision-provider.contract.test.ts`
-- Test: `tests/integration/application/recognition.test.ts`
+- Create: `tests/e2e/product-pivot.spec.ts`, `tests/e2e/fixtures.ts`（如需要）
+- Modify: `playwright.config.ts`, `src/infrastructure/http/session-client.ts`, `components/session/session-shell.tsx` 仅为真实恢复缺陷
+- Modify only when a reproduced E2E defect requires it: relevant route/application/component files
+- Preserve: production secrets, real `data/`, user images and package lock unless separately authorized
 
-**Provider contract:**
-
-```ts
-interface VisionInput {
-  overviewImageId: string;
-  labelImageIds: string[];
-}
-
-interface VisionResult {
-  ingredients: DetectedIngredient[];
-  needsLabelCloseup: boolean;
-  userQuestions: string[];
-}
-```
+**Tests:** `pnpm test:e2e` 至少有可执行测试并覆盖完整流程、移动视口、refresh、网络错误恢复、幂等重放和两条满意路径；失败时保留 trace/screenshot 等可审计产物但不提交用户数据。
 
 **Steps:**
 
-- [x] 写 provider contract test：fallback 与 Qwen adapter 的解析层都必须输出同一 `VisionResultSchema`。
-- [x] 写非法模型 JSON、超时、低置信酒类、未知 ABV 测试。
-- [x] 实现 fallback provider，返回可编辑的演示识别结果并显式 `sourceMode=fallback`。
-- [x] 实现 Qwen adapter：服务端 SDK、超时、结构化 Schema、一次纠错重试；不得把 SDK 类型泄漏到应用层。
-- [x] 实现材料规范化：保留 raw name，映射受控 category；无法映射为 `unknown`，不自行杜撰。
-- [x] 识别用例从 `SCAN` 进入 `CONFIRM`；Provider 失败保留图片且不破坏会话。
-- [x] 确认用例验证所有材料 `confirmed=true`，酒类 ABV 已确认后才进入 `READY`。
-- [x] 测试用户增加、删除、改名和纠正 ABV；审计事件只保存摘要。
-- [x] 运行 provider contract 与应用集成测试。
+- [ ] 先写第一个真正可运行的 RED E2E，确认不是 `No tests found`。
+- [ ] 配置隔离 test database/upload directory 和 deterministic fallback fixture。
+- [ ] 实现完整流程 E2E 与网络故障注入，先让关键断言 GREEN。
+- [ ] 运行 `pnpm test:e2e`、全量质量门禁和空数据库迁移回归。
+- [ ] 提交并等待独立 Review；Review PASS 后才进入 Task 8。
 
-**Acceptance:** “模型负责猜、用户负责确认、规则决定能否使用”在代码边界中成立。
+**Acceptance:** `pnpm test:e2e` 实际发现并执行测试；完整闭环和恢复场景可重复；任何关键 E2E 失败阻塞发布；测试不触碰真实 `data/` 或秘密。
 
-**Commit:** `feat: add confirmable ingredient recognition`
+**Verification:** `pnpm test:e2e`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck`、`pnpm test`、`pnpm build`，以及空临时 SQLite 迁移验证。
 
----
+**Commit message:** `test: cover product pivot journey with playwright`
 
-## Task 9: 初次三策略与单配方调整 Recipe Provider
+**Reviewer gate:** Claude Code 独立审查 E2E 是否真实执行、路径是否完整、隔离是否可信、失败证据是否可读；PASS 后才进入 Task 8。
+
+## Task 8: Real Provider + Real Phone Demo Freeze
+
+**Goal:** 在不改变 Product Pivot 范围的前提下，用真实 Provider、真实手机和本地 fallback 完成最终 Demo 彩排并冻结可复现运行证据。
+
+**Scope:** 受控 `.env.local` 下的真实 Vision/Recipe Provider smoke、超时/401/403/429/5xx 分类、fallback 对照、真实手机局域网流程、三次完整演示、至少一次 V3、备份/恢复和最终发布记录。
+
+**Explicit non-scope:** 不上云、不登录、不加新 Provider 架构、不抓取小红书、不把真实密钥写入仓库/日志/截图、不以一次成功 smoke 代替三次手机彩排。
 
 **Files:**
 
-- Create: `src/providers/recipe-provider.ts`
-- Create: `src/infrastructure/providers/fallback-recipe-provider.ts`
-- Create: `src/infrastructure/providers/qwen-recipe-provider.ts`
-- Create: `src/agent/prompts/generate-recipes.ts`
-- Create: `src/agent/validate-candidate-set.ts`
-- Create: `src/agent/rank-recommendation.ts`
-- Create: `src/agent/fallback/catalog.ts`
-- Test: `tests/contract/providers/recipe-provider.contract.test.ts`
-- Test: `tests/unit/agent/validate-candidate-set.test.ts`
-- Test: `tests/unit/agent/rank-recommendation.test.ts`
+- Modify only with actual reproducible evidence: `PRODUCTION.md`, `Task.md`
+- Read/verify: `.env.example`, `src/config/env.ts`, `src/infrastructure/providers/qwen-vision-provider.ts`, `src/infrastructure/providers/qwen-recipe-provider.ts`, `scripts/db-migrate.ts`, backup tooling if present
+- Runtime-only, never commit: `.env.local`, `data/`, `backups/`, screenshots containing user data or secrets
 
-**Provider contract:**
-
-```ts
-interface RecipeProvider {
-  generate(input: RecipeGenerationInput): Promise<RecipeCandidateSet>;
-  adjust(input: RecipeAdjustmentInput): Promise<RecipeCandidate>;
-}
-```
+**Tests:** 真实 Provider smoke、fallback smoke、`pnpm test:e2e`、全量质量门禁、空数据库迁移两次、SQLite integrity/backup restore、PRODUCTION 演示前人工清单。
 
 **Steps:**
 
-- [x] 写 contract tests：`generate()` 必须恰好返回 A/B/C；`adjust()` 必须只返回一个 `RecipeCandidate`，以当前配方和本次反馈为输入，不包装成三套；C 缺失材料最多 2 个且来自允许列表。
-- [x] 写重复度测试：相同材料、相同步骤、只有无意义 1 ml 差异判为重复；比例变化引发可解释体验差异时允许。
-- [x] 实现 deterministic fallback catalog，至少覆盖白酒 + 水/冰、汽水、茶、果汁等常见组合；所有用量可由 Safety 计算。
-- [x] 实现推荐排序纯函数：口味距离、安全级别、缺失材料数、实验性构成透明分数；输出外显 `fitReason`。
-- [x] 实现 Qwen recipe adapter 和 Prompt：`generate()` 要求 JSON Schema、三策略、differenceReason、推荐所需特征；`adjust()` 要求单个下一版本、父配方上下文和反馈响应；一次解析修复重试。
-- [x] Provider 输出中的 safety 字段视为提示，最终字段由 Task 4 引擎覆盖。
-- [x] 写无真实 API 的 adapter 解析测试，使用静态响应 fixture；真实调用留 Task 17 smoke。
-- [x] 运行 agent 与 provider contract tests。
+- [ ] 配置真实 Provider 前确认密钥不在 shell history、日志、截图或 Git diff。
+- [ ] 运行视觉和配方真实 smoke，验证响应仍经同一 Zod/Safety 管线。
+- [ ] 模拟 Provider 错误和 fallback，记录稳定错误码与恢复标准。
+- [ ] 用同一笔记本、手机、网络和浏览器完成三次完整 Product Pivot 闭环；至少一次继续到 V3。
+- [ ] 关闭真实 Provider 再跑一次 fallback 闭环。
+- [ ] 完成备份/恢复演练和 PRODUCTION 检查表，只记录可复现事实。
+- [ ] 运行最终门禁并提交冻结记录。
 
-**Acceptance:** 不联网也能初次给出三套有效方案，并能对当前配方给出一个有效下一版本；真实与 fallback Provider 可互换；比例方案不会被误删。
+**Acceptance:** 真实 Provider 与 fallback 均能完成闭环；真实手机三次无阻断；单卡、换批、Stepper、满意拍照/跳过、Vn+1 均有证据；备份可恢复；发布门禁和 E2E 全绿；无秘密/用户图片/真实数据库入 Git。
 
-**Commit:** `feat: add three-strategy recipe providers`
+**Verification:** `pnpm lint`、`pnpm format:check`、`pnpm typecheck`、`pnpm test`、`pnpm test:e2e`、`pnpm build`、空库 `pnpm db:migrate`/`pnpm db:seed`、备份恢复和真实手机人工清单。
 
----
+**Commit message:** `chore: freeze real provider and mobile demo`
 
-## Task 10: 生成用例、Safety 修复循环与配方 API
+**Reviewer gate:** Claude Code 最终独立只读审查完整验收、自动门禁、真实浏览器/手机证据、秘密和 Git 状态；PASS 后才可称 Product Pivot Demo 冻结。
 
-**Files:**
-
-- Create: `src/application/generate-recipe-set.ts`
-- Create: `src/application/repair-blocked-recipe.ts`
-- Create: `src/application/select-recipe.ts`
-- Create: `app/api/sessions/[sessionId]/recipes/route.ts`
-- Create: `app/api/sessions/[sessionId]/selection/route.ts`
-- Test: `tests/integration/application/generate-recipe-set.test.ts`
-- Test: `tests/integration/api/recipe-routes.test.ts`
-
-**Generation algorithm:**
+## Dependency map
 
 ```text
-validate → load confirmed input → state guard → safety precheck
-→ provider generates 3 → Zod parse → dedupe → Safety each
-→ repair BLOCK max 2 → fallback replace → rank → transaction save
+Task 0 Documentation & Baseline Lock
+  ↓
+Task 1 Visual System & Mobile Shell
+  ↓
+Task 2 Recipe Swipe Deck
+  ↓
+Task 3 Reject All → Regenerate Batch
+  ↓
+Task 4 Mixing Stepper Redesign
+  ↓
+Task 5 Satisfaction-first Feedback & Adjustment UI
+  ↓
+Task 6 Optional Final Drink Photo & Completed UI
+  ↓
+Task 7 Full Recovery + Playwright E2E
+  ↓
+Task 8 Real Provider + Real Phone Demo Freeze
 ```
-
-**Steps:**
-
-- [x] 先写 happy-path 集成测试，断言单事务写入 recipe_set、3 recipes、3 safety_decisions、推荐 ID、decision_event，并进入 `RECIPE_SELECTION`。
-- [x] 写 ABV 未确认预检测试：Provider 调用次数必须为 0，返回 422。
-- [x] 写一个候选 BLOCK 后修复成功测试；断言安全引擎在修复后再次运行。
-- [x] 写连续两次修复仍 BLOCK 测试；断言替换为 fallback，最终可选 3 套均为 ALLOW/WARN。
-- [x] 写 Provider 非法 JSON/超时测试：重试一次后 fallback；记录降级，不泄漏响应全文。
-- [x] 写事务失败与重复 requestId 测试：无半写、无重复调用副作用。
-- [x] 实现应用用例，模型调用在事务外，最终版本检查与落库在短事务内；若期间版本改变则 409。
-- [x] 选择用例要求 `WARN` 携带 `warningAcknowledged=true`；`BLOCK` 永远拒绝；成功进入 `MIXING/currentStep=0`。
-- [x] 实现薄 API、错误映射和成功信封。
-- [x] 运行生成/选择集成测试、Safety 全套和 build。
-
-**Acceptance:** M2 的后端闭环完成；任意 Provider 故障或危险候选都无法绕过 Safety 或破坏三方案合同。
-
-**Commit:** `feat: orchestrate safe recipe generation and selection`
-
----
-
-## Task 11: 手机 UI 壳、五档偏好与拍照确认
-
-**Files:**
-
-- Create: `app/session/[sessionId]/page.tsx`
-- Create: `components/session/session-shell.tsx`
-- Create: `components/session/progress-header.tsx`
-- Create: `components/session/fixed-action-bar.tsx`
-- Create: `components/preferences/taste-slider.tsx`
-- Create: `components/preferences/preferences-screen.tsx`
-- Create: `components/scan/camera-screen.tsx`
-- Create: `components/scan/image-preview.tsx`
-- Create: `components/ingredients/ingredient-confirmation-screen.tsx`
-- Create: `components/ingredients/ingredient-row.tsx`
-- Create: `src/infrastructure/http/session-client.ts`
-- Test: `tests/components/preferences/*.test.tsx`
-- Test: `tests/components/ingredients/*.test.tsx`
-
-**Steps:**
-
-- [ ] 先写 `TasteSlider` 测试：初始值、键盘方向键、五档整数、两端标签和可访问名称。
-- [ ] 实现原生 `input[type=range]`，不安装 slider 库；视觉刻度与值说明不影响键盘可用性。
-- [ ] 写偏好提交测试：按钮 loading 时不可重复提交；失败保留输入；成功渲染 SCAN。
-- [ ] 实现 `SessionShell` 根据服务端快照切屏，不在客户端复制一套业务状态机。
-- [ ] 写拍照测试：`accept="image/jpeg,image/png,image/webp"`、`capture="environment"`，预览可替换，上传阶段明确。
-- [ ] 写材料确认测试：用户可增删改；未确认或酒类 ABV 缺失时 CTA 禁用并解释；不得只显示 confidence 百分比不让编辑。
-- [ ] 实现 session client，每个 mutation 创建稳定 requestId；重试同一次操作复用 requestId，成功后才生成新的。
-- [ ] 手机视口检查固定底部 CTA 不遮挡内容，触控目标至少约 44px，错误提示可被屏幕阅读器感知。
-- [ ] 运行组件测试、typecheck 和 build。
-
-**Acceptance:** 用户能在手机上完成偏好、拍照、识别纠错和强制确认；失败不会清空表单。
-
-**Commit:** `feat: build mobile preferences scan and confirmation flow`
-
-**Learning checkpoint（用户手写，不由 Agent 代写）：** 在 `learning/day1-vanilla/` 用 HTML/CSS/JS 复现一个滑杆、表单提交和 `<pre>` 输出；能口述 DOM 事件顺序后再继续。
-
----
-
-## Task 12: 三卡选择与分步调饮体验
-
-**Files:**
-
-- Create: `components/recipes/recipe-selection-screen.tsx`
-- Create: `components/recipes/recipe-card.tsx`
-- Create: `components/safety/safety-badge.tsx`
-- Create: `components/safety/warning-confirmation.tsx`
-- Create: `components/mixing/mixing-screen.tsx`
-- Create: `components/mixing/mixing-step.tsx`
-- Create: `src/application/advance-mixing.ts`
-- Create: `app/api/sessions/[sessionId]/mixing/advance/route.ts`
-- Test: `tests/components/recipes/*.test.tsx`
-- Test: `tests/components/mixing/*.test.tsx`
-- Test: `tests/integration/application/advance-mixing.test.ts`
-
-**Steps:**
-
-- [x] 写三卡测试：固定 A/B/C 顺序、推荐标签、differenceReason、材料/用量/ABV/步骤/缺失/安全全部可见。
-- [x] 写安全可访问性测试：三张最终卡只能是 ALLOW/WARN；WARN 有图标+文字+原因，必须显式 checkbox/button 确认；被 BLOCK 的原候选只在独立审计提示中保留，不能占用可选卡。
-- [x] 实现卡片，不把推荐方案自动选中；用户必须主动确认。
-- [x] 写 mixing 用例测试：选择后 step 0；合法前进/后退；越界 409；最后一步完成进入 FEEDBACK。
-- [x] 写重复 advance 的 requestId 测试，currentStep 只推进一次。
-- [x] 实现一次只显示一步的界面，提供完成、返回、遇到问题；普通步骤不要求拍照。
-- [x] 对规格标记的关键节点允许附加照片，但不阻断无照片的普通步骤。
-- [x] 中途刷新组件从服务端 `currentStep` 恢复，不使用 localStorage 作为真相源。
-- [x] 运行组件、应用集成测试和手机 viewport E2E 子集。
-
-**Acceptance:** 用户可比较并自主选择；Safety 信息清楚；刷新和重复点击不跳步。
-
-**Commit:** `feat: add recipe selection and resumable mixing ui`
-
----
-
-## Task 13: 成品反馈、单配方 Vn 版本链与实验记忆
-
-**Files:**
-
-- Create: `src/application/save-feedback.ts`
-- Create: `src/application/generate-adjustment.ts`
-- Create: `src/agent/build-adjustment-constraints.ts`
-- Create: `src/application/complete-session.ts`
-- Create: `app/api/sessions/[sessionId]/feedback/route.ts`
-- Create: `app/api/sessions/[sessionId]/adjustments/route.ts`
-- Create: `app/api/sessions/[sessionId]/complete/route.ts`
-- Create: `components/feedback/feedback-screen.tsx`
-- Create: `components/feedback/delta-control.tsx`
-- Create: `components/adjustment/adjustment-screen.tsx`
-- Create: `components/completed/completed-screen.tsx`
-- Test: `tests/unit/agent/build-adjustment-constraints.test.ts`
-- Test: `tests/integration/application/feedback-adjustment.test.ts`
-- Test: `tests/components/feedback/*.test.tsx`
-
-**Steps:**
-
-- [ ] 写反馈 Schema/UI 测试：评分 1–5、accepted、四维 `-2..2`、notes 上限、成品图可选。
-- [ ] 写 delta 转约束测试，例如酒感 `-2` 必须产生降低纯酒精量或稀释比例的明确约束，不能只改文案。
-- [ ] 实现保存反馈用例，进入 `ADJUSTMENT` 或在 accepted 且无调整需求时允许 `COMPLETED`。
-- [ ] 写连续版本集成测试：V1 → V2 → V3，每次只返回一个 `RecipeCandidate`，版本号递增，`parentRecipeId` 指向当前配方，`feedbackId` 关联本次反馈；每个版本重新经过 Zod Schema 与确定性 Safety，不重复套用初次三方案合同。
-- [ ] 写模型调整失败 fallback 测试；fallback 每次只返回一个下一版本，并用确定性比例规则响应 delta。
-- [ ] 实现实验记忆，只保存 `recipeId/feedbackId/summary/tags`；读取记忆只能作为创意上下文，之后仍经过 Safety。
-- [ ] 调整页显示当前配方与下一版本的用量和体验变化；用户可接受下一版本继续 MIXING，或满意/不再调整而结束；完成后仍可再次反馈并请求新的下一版本。
-- [ ] 完成页展示本次轨迹和安全摘要，不显示隐藏推理。
-- [ ] 运行 agent、应用、组件测试和完整 build。
-
-**Acceptance:** 成品反馈形成可解释、可追溯的版本链；记忆不能绕过 Safety；M3 完成。
-
-**Commit:** `feat: close feedback adjustment and memory loop`
-
----
-
-## Task 14: 可选 SearchProvider 与来源边界
-
-**Files:**
-
-- Create: `src/providers/search-provider.ts`
-- Create: `src/infrastructure/providers/disabled-search-provider.ts`
-- Create: `src/infrastructure/providers/web-search-provider.ts`
-- Create: `src/agent/inspiration/local-library.ts`
-- Create: `src/application/find-inspiration.ts`
-- Test: `tests/contract/providers/search-provider.contract.test.ts`
-- Test: `tests/integration/application/find-inspiration.test.ts`
-
-**Public contract:**
-
-```ts
-interface InspirationResult {
-  title: string;
-  sourceUrl: string;
-  sourceName: string;
-  summary: string;
-  retrievedAt: string;
-}
-```
-
-**Steps:**
-
-- [ ] 写 contract tests：结果必须有 http(s) URL、来源名、检索时间和短摘要；禁止返回网页全文。
-- [ ] 写 disabled、timeout、429、无结果测试，全部回退 `local-library`，且不阻断生成。
-- [ ] 实现 2.5 秒默认预算、最多结果数和可替换 adapter。
-- [ ] 明确禁止 Playwright/浏览器自动化抓小红书；Provider 只使用合规搜索接口或公开可访问来源。
-- [ ] 给 RecipeGenerationInput 只传摘要和 URL；SafetyInput 不接收搜索结论作为规则事实。
-- [ ] 记录 `search_used/search_degraded` 决策事件，不记录页面全文。
-- [ ] 运行 contract、应用测试和 Safety 回归测试。
-
-**Acceptance:** 搜索是纯增强；关闭、超时或限流时完整闭环行为不变；来源可展示但不假装原创。
-
-**Commit:** `feat: add optional bounded inspiration search`
-
----
-
-## Task 15: 错误恢复、可观察性与会话恢复加固
-
-**Files:**
-
-- Create: `src/infrastructure/logging/logger.ts`
-- Create: `src/infrastructure/http/problem-mapper.ts`
-- Create: `src/application/record-decision-event.ts`
-- Create: `components/session/error-panel.tsx`
-- Create: `components/session/resume-session.tsx`
-- Create: `app/error.tsx`, `app/not-found.tsx`
-- Test: `tests/unit/infrastructure/logging/logger.test.ts`
-- Test: `tests/integration/resilience/idempotency.test.ts`
-- Test: `tests/integration/resilience/session-resume.test.ts`
-
-**Steps:**
-
-- [ ] 写日志脱敏测试：输入密钥、Authorization、Cookie、绝对路径、完整 session URL，输出均不得出现原值。
-- [ ] 实现结构化 logger：timestamp、level、event、requestId、sessionRef、durationMs、outcome、errorCode、providerMode。
-- [ ] 写 API 错误映射矩阵测试：400/404/409/413/415/422/503/500，500 不含 stack。
-- [ ] 写断网后同 requestId 重试测试；第一次提交已落库但响应丢失时，第二次返回原响应。
-- [ ] 写 GET 快照恢复测试：每一个 SessionState 都能得到足够渲染数据，MIXING 包含 currentStep。
-- [ ] 实现 UI 错误面板，明确“重试、手动继续、重新加载”之一；不可只显示“出错了”。
-- [ ] 实现 decision events 外显摘要和允许的 metadata 白名单。
-- [ ] 运行 resilience、logging、API 与 build。
-
-**Acceptance:** 网络抖动、重复点击、刷新和可预期 Provider 故障均有明确恢复路径；日志可排障且不泄密。
-
-**Commit:** `feat: harden recovery logging and session resume`
-
----
-
-## Task 16: 完整 Playwright E2E、移动端与可访问性
-
-**Files:**
-
-- Create: `tests/e2e/full-fallback-flow.spec.ts`
-- Create: `tests/e2e/safety-block.spec.ts`
-- Create: `tests/e2e/resume-and-idempotency.spec.ts`
-- Create: `tests/e2e/feedback-iterations.spec.ts`
-- Create: `tests/e2e/upload-errors.spec.ts`
-- Create: `tests/e2e/helpers/session.ts`
-- Modify: `playwright.config.ts`
-
-**Required automated scenarios:**
-
-1. 错认材料后用户修正。
-2. 未知 ABV 阻止生成。
-3. 酒精 + 能量饮料触发 BLOCK 并被替换。
-4. 实验性未知组合 WARN，需确认。
-5. 非法模型 JSON 进入 fallback。
-6. 重复提交不重复创建。
-7. 调饮第 3 步刷新恢复。
-8. 连续反馈生成 V1 → V2 → V3；每次调整是独立请求，且新版本关联父配方和本次反馈。
-9. 客户端 bundle/响应中无 API key。
-10. 无搜索、无真实模型完成全闭环。
-
-**Steps:**
-
-- [ ] 为 E2E 使用独立 `data/test-e2e.db` 与上传目录；每个测试使用唯一会话，不依赖执行顺序。
-- [ ] 配置 iPhone 13 和常见 Android viewport；先跑 fallback 完整流并确认失败。
-- [ ] 补齐 UI `data-testid` 仅限稳定业务锚点；优先 role/label 查询。
-- [ ] 实现上述十个场景，失败时保存 screenshot/trace，但产物不提交。
-- [ ] 检查 320px 宽度无横向滚动、固定 CTA 不遮挡、键盘可完成关键流程。
-- [ ] 使用自动可访问性检查可作为增强，但不得替代手动检查 label、焦点、颜色外信息和动态错误播报。
-- [ ] 连续运行两次 E2E，排除依赖测试顺序和脏数据库的偶然通过。
-- [ ] 运行完整发布门禁。
-
-**Acceptance:** 十个场景在两个移动 viewport 通过；测试可重复且不污染真实数据。
-
-**Commit:** `test: cover full mobile agent journey`
-
----
-
-## Task 17: 真实 Qwen、真实手机与发布冻结
-
-**Files:**
-
-- Create: `tests/smoke/qwen-provider.smoke.ts`
-- Create: `scripts/db-backup.ts`
-- Modify: `package.json`（增加 `smoke:qwen`、`db:backup`）
-- Modify: `PRODUCTION.md`（只记录经过验证的实际差异）
-- Modify: `Task.md`（完成记录）
-
-**Steps:**
-
-- [ ] 在受控 `.env.local` 配置真实 Provider；运行前确认密钥不在 shell history、日志或 Git diff。
-- [ ] 用可公开测试输入运行一次视觉和配方 smoke；断言响应经同一 Zod Schema，保存耗时/模式，不保存完整响应。
-- [ ] 模拟超时、401/403、429、5xx，验证错误分类和 fallback；真实错误不得变成 500 stack。
-- [ ] 实现 `db:backup`，使用 better-sqlite3 支持的 backup API 或审阅过的 `VACUUM INTO`，并测试恢复后的数据库完整性。
-- [ ] 按 `PRODUCTION.md` 使用真实笔记本、手机和网络跑演示前清单。
-- [ ] 连续三次完成：偏好 → 拍照 → 确认 → 初次三方案 → 选择 V1 → 调饮 → 反馈 → 接受 Vn+1 继续调饮，或满意/不再调整完成；至少一次真实流程继续反馈到 V3。
-- [ ] 其中一次关闭真实 Provider，证明 fallback 完整可用。
-- [ ] 记录 build ID、设备、浏览器、网络、结果、已知风险；只在 `PRODUCTION.md` 写可复现事实。
-- [ ] 最终运行：
-
-```bash
-pnpm lint
-pnpm format:check
-pnpm typecheck
-pnpm test
-pnpm test:e2e
-pnpm build
-pnpm db:backup --output ./backups/final-smoke.db
-```
-
-- [ ] 检查 `git status` 只有预期变更；检查 Git 历史无密钥和用户图片。
-
-**Acceptance:** M4 完成；真实模式与 fallback 模式都可跑；三次真实手机闭环无阻断；备份可恢复；发布门禁全绿。
-
-**Commit:** `chore: verify qwen mobile demo and freeze mvp`
-
----
-
-## Development Task Dependency Map
-
-```mermaid
-flowchart TD
-    T1["1 工具链"] --> T2["2 领域契约"]
-    T2 --> T3["3 状态机"]
-    T2 --> T4["4 Safety"]
-    T2 --> T5["5 数据库"]
-    T3 --> T6["6 会话 API"]
-    T5 --> T6
-    T6 --> T7["7 图片"]
-    T7 --> T8["8 视觉确认"]
-    T4 --> T10["10 安全生成"]
-    T9["9 配方 Provider"] --> T10
-    T8 --> T10
-    T10 --> T11["11 前半 UI"]
-    T11 --> T12["12 选择调饮"]
-    T12 --> T13["13 反馈 Vn 版本链"]
-    T13 --> T14["14 搜索增强"]
-    T14 --> T15["15 恢复加固"]
-    T15 --> T16["16 E2E"]
-    T16 --> T17["17 真实彩排"]
-```
-
-说明：图中 T4、T5 可以在人员并行时独立开发，但同一 Agent 执行本计划时仍按编号顺序，减少共享契约漂移。
 
 ## Definition of Done
 
-项目只有在以下全部满足时完成：
+- [ ] Product Pivot Spec、AGENTS、PRODUCTION、Task 和实际代码边界一致。
+- [ ] 每批初次/换批都恰好三套 A/B/C；UI 单卡且按 recommendation ranking 展示。
+- [ ] 左滑无后端副作用；三张全拒绝后只有主动点击才 regenerate。
+- [ ] 右滑通过既有 select 进入 MIXING；Stepper currentStep 可刷新恢复且不要求 checkpoint photo。
+- [ ] Satisfaction-first、Vn+1、final drink 拍摄/跳过和两条 COMPLETED 路径均可用。
+- [ ] `FINAL_PHOTO` 不存在；分享、拒绝原因调查和旧 Task 13C 不进入当前 MVP。
+- [ ] 所有候选和调整版本经 Zod、deterministic Safety；BLOCK 无绕过。
+- [ ] `requestId`、`expectedVersion`、事务和刷新恢复在新增路径成立。
+- [ ] Task 7 之后 `pnpm test:e2e` 不再是 `No tests found`，并作为阻塞门禁。
+- [ ] Task 8 真实 Provider/fallback、真实手机三次彩排、备份恢复和最终门禁有证据。
 
-- [ ] 架构规格第 16 节全部满足。
-- [ ] Task 1–17 所有验收项有真实验证证据。
-- [ ] `AGENTS.md`、`PRODUCTION.md`、正式规格和实际代码一致。
-- [ ] 所有候选在可选择前经过确定性 Safety；BLOCK 无绕过。
-- [ ] 真实 Provider 和 fallback 均能完成闭环。
-- [ ] 空数据库初始化、备份和恢复已实测。
-- [ ] 手机连续三次全流程无阻断问题。
-- [ ] 五项自动门禁和 E2E 全绿，无 skip/only。
-- [ ] 无密钥、用户图片、真实数据库进入 Git。
-
-## Progress Log
-
-按以下格式追加，不改写历史记录：
+## Progress log
 
 ```text
 YYYY-MM-DD | Task N | commit <sha>
@@ -825,87 +410,14 @@ YYYY-MM-DD | Task N | commit <sha>
 
 当前：
 
-- 2026-08-21 | Planning | 未提交
-  - 验证：架构六段设计获用户确认；正式规格、协作规则、运行规范与实施计划已起草。
-  - 结果：进入 Task 1 前等待文档审阅。
-  - 风险：Qwen 视觉模型具体 ID、真实手机 HEIC 支持和 Windows 防火墙行为需在 Task 17 以真实环境验证。
+- 2026-08-28 | Task 0 | Documentation Pivot implementation commit（独立 Review pending）
+  - 验证：已完成规定文档读取、冻结 baseline/结构调查、旧 Task 原样归档；提交前运行 `git diff --check`、Markdown format check（若适用）和范围审计。
+  - 结果：新 Product Pivot Spec、AGENTS、PRODUCTION、Task 0–8 和 frozen pre-pivot archive 已建立；尚未开始任何 Product Pivot 生产代码。
+  - 风险：Claude Code 独立 Reviewer 尚未审查；当前 baseline 的 `pnpm test:e2e` 已知为 `No tests found`，必须由 Task 7 补齐。
 
+## Decision log
 
-- 2026-08-22 | Task 1 | commit c6ebf64
-  - 验证：pnpm install --frozen-lockfile；pnpm format:check；pnpm lint；pnpm typecheck；pnpm test；pnpm build；GET /api/health 返回 HTTP 200 且响应不含配置路径或密钥。
-  - 结果：完成 Next.js 16/React 19 工具链、冻结依赖、环境 Schema、健康快照与薄健康路由、最小移动端状态页。
-  - 风险：真实 SQLite/图片/Provider、手机演示与数据库迁移留在后续任务；Qwen 和真实手机环境尚未验证。
-
-
-- 2026-08-23 | Task 2 | commit cd658b1
-  - 验证：测试先行；首次可执行领域测试为 7 files、32 tests 中 31 通过，修正格式合法 UUID 负例后为 8 files、35 tests 全部通过；pnpm install --frozen-lockfile；pnpm typecheck；pnpm lint；pnpm format:check；pnpm test（10 files，40 tests）；pnpm build。pnpm test:e2e 未通过，因当前仓库没有 E2E 测试文件（No tests found）。
-  - 结果：完成口味、会话状态、材料、三套配方、安全等级、反馈、ID 和 API 成功/错误信封的 Zod 运行时 Schema、品牌 ID 与共享 fixture。
-  - 风险：E2E 测试场景、状态机、Safety 引擎和数据库仍未实现，按要求停在 Task 2；真实 Provider、图片与手机环境仍待后续任务验证。
-
-- 2026-08-23 | Task 3 | commit 643f105
-  - 验证：独立 Review PASS；pnpm vitest run tests/unit/workflow/session-machine.test.ts（26/26）；pnpm typecheck；pnpm lint；定向 Prettier；集成分支 pnpm lint、pnpm format:check、pnpm typecheck、pnpm test（19 files，106 tests）、pnpm build 均 exit 0。
-  - 结果：完成表驱动会话状态机、完整 Guard、MIXING 步骤边界和调整版本选择约束；已合并至集成提交 92ebd70。
-  - 风险：Task 6 应用 API 尚未开始；E2E 测试仍未建立。
-
-- 2026-08-23 | Task 4 | commit 416ebc9
-  - 验证：独立 Review CONDITIONAL PASS（Task.md 按集成流程延期）；pnpm vitest run tests/unit/safety（27 tests）；pnpm typecheck；pnpm lint；定向 Prettier；集成五项门禁全部 exit 0。
-  - 结果：完成确定性 Safety 规则、酒精计算、BLOCK/WARN/experimental 聚合和规则证据 catalog；已合并至集成提交 92ebd70。
-  - 风险：真实 Provider 和现实世界安全证据仍待后续任务验证；E2E 测试仍未建立。
-
-- 2026-08-23 | Task 5 | commit 7cb7c56
-  - 验证：独立 Review PASS；临时 SQLite 迁移/seed 各执行两次；pnpm vitest run tests/integration/repositories（5 files，13 tests）；pnpm typecheck；pnpm lint；Task 5 精确 Prettier；集成五项门禁全部 exit 0。
-  - 结果：完成 Drizzle 13 表 Schema、迁移、事务、Repository、fallback seed、版本默认值和失败回滚测试；已合并至集成提交 92ebd70。
-  - 风险：后续应用层 API、上传和 Provider 仍未实现；测试不触碰 data/app.db。
-- 2026-08-23 | Task 6 | commits d34ece0, 6cd6f47, b0bfd54
-  - 验证：TDD Red 阶段新增跨操作指纹和唯一键竞争测试为 2 项失败；修复后定向应用/API 测试 14/14；pnpm lint；pnpm format:check；pnpm typecheck；pnpm test（21 files，120 tests）；pnpm build；全新临时 SQLite 连续执行两次 pnpm db:migrate（均 exit 0）；Task 5 database/repository 回归 2 files、6 tests；独立 Review 最终 PASS。
-  - 结果：完成创建会话、偏好保存、恢复快照、全局 requestId + request_fingerprint 幂等、操作域隔离、VERSION_CONFLICT/IDEMPOTENCY_KEY_REUSED 错误映射；session、偏好、状态、版本和幂等记录在同一事务；Route Handler 保持薄层。
-  - 风险：按 Task 6 明确范围未运行 pnpm test:e2e（当前无 E2E 文件）；真实手机、浏览器 E2E、Provider、上传和后续状态流程留在后续任务；既有幂等记录迁移时使用 legacy:<id> 指纹，无法凭历史数据重建原始请求内容，旧记录重试会保守返回幂等键冲突。
-- 2026-08-23 | Task 3 状态机版本无关兼容修正
-  - 验证：TDD RED 为 27 tests、3 failures（均因旧 V2 字段）；修正后 Task 2 Domain 8 files/35 tests、Task 3 27/27、Task 5 Repository 5 files/13 tests；pnpm lint、pnpm format:check、pnpm typecheck、pnpm test（21 files/121 tests）、pnpm build 均 exit 0。
-  - 结果：将 `hasSelectedV2Recipe` 改为 `hasSelectedAdjustedRecipe`，覆盖 V2、再次反馈后的 V3 和未选择本次调整版本的拒绝路径；保留初次 A/B/C Domain 约束。
-  - 数据归属：RecipeCandidate 仍只承载候选内容；version/parentRecipeId 由正式 Recipe/Repository 保存；feedbackId 由 Feedback 记录保存并通过 recipeId 指向被反馈配方；直接 `recipes.feedback_id` 关联留在 Task 13 范围。
-  - 风险：完整反馈用例、Provider、上传、UI 和 Task 7–10 尚未开始。
-
-- 2026-08-25 | Task 7 | implementation 753c7ab0362fe46e8a2340486b435e6376c2efdf; integration merge 16cefd07671752fda896601310bb9d44edca1249
-  - 验证：源分支完整历史含 6028bcb、9d72dff、753c7ab；独立 Review PASS；pnpm install --frozen-lockfile、pnpm lint、pnpm format:check、pnpm typecheck、pnpm test（33 files，179 passed，2 skipped）、pnpm build、git diff --check 均 exit 0；物理路径专项 1 passed、2 skipped，两个 symlink skip 均保留 EPERM 原因，Windows junction 通过。
-  - 结果：完成字节/MIME/魔数/解码/像素/EXIF/JPEG 校验、路径边界、requestId/fingerprint/expectedVersion 幂等并发、事务失败补偿删除和 multipart 稳定错误映射；未改共享 Domain。
-  - 风险：pnpm test:e2e 未运行（本次 M2 严格命令清单未要求，当前无 E2E 文件）；build 有 Next/Turbopack 动态 UPLOAD_DIR 文件追踪 warning；真实手机和 HEIC 兼容性留后续真实环境验证。
-
-- 2026-08-25 | Task 9 | implementation c3f7b5f2c6a83a938e73940b98b318e277a33b47; integration merge b8a8ccff9330f9669e44594f7f60be93c86b9d6a
-  - 验证：源分支完整历史含 d399f56、9acecc3、e7514d9、c3f7b5f；独立 Review PASS；pnpm install --frozen-lockfile、pnpm lint、pnpm format:check、pnpm typecheck、pnpm test（33 files，179 passed，2 skipped）、pnpm build、git diff --check 均 exit 0；未调用真实 Qwen API。
-  - 结果：完成 fallback 与 Qwen 可互换 RecipeProvider、generate A/B/C、adjust 单候选、Zod Schema、一次修复重试、timeout/fallback、材料边界和透明推荐排序；`confirmedMaterialNames` 来自已确认材料契约，供后续 Task 8/10 传入并约束 A/B/C。
-  - 风险：真实 Qwen API、Task 8 视觉识别和 Task 10 生成/安全修复用例仍未开发或验证；模型 safety 仅作提示，最终裁决仍由 Safety 引擎负责。
-
-- 2026-08-25 | Task 8 | integration verification af733f5be9e8c29fcb124ea249f6a0f3b1a46911; evidence tests 5f75a8b14f9d8bb7a5c2caebb5a8379113bf1d6d
-  - 验证：Red 测试提交 f721e2c；独立 Integration Review PASS（Critical 0、Important 0、Minor 0）；pnpm lint、pnpm format:check、pnpm typecheck、pnpm test（41 files，224 passed，2 skipped）、pnpm build、git diff --check 均通过；隔离临时 SQLite 空库迁移两次、自动化 `PRAGMA integrity_check` 严格为 `ok`；定向 lease/迁移测试 6 files、32 passed。
-  - 结果：完成 Task 7→8 真实 JPEG 组合链路、Provider 事务外调用、持久化 SQLite session lease、requestId/expectedVersion 原子绑定、过期接管、旧 owner 提交/释放保护，以及识别失败保留图片、幂等 replay、unknown/ABV Guard 和原子状态推进验证；Task 9 Provider 未被 Task 8 修改或提前调用。
-  - 风险：未调用真实 Qwen 网络、当前仓库无 E2E 测试、真实手机验证和 Task 10 仍按计划留待后续；build 保留既有 Next/Turbopack `UPLOAD_DIR` 动态追踪 warning。
-- 2026-08-26 | Task 10 | implementation 2831de5；review 修复链 e91769c、22bb8b1、14b8332、661de98、df48f78、9cc53ba、c7bd2e1、48afeb3、6923630；integration merge fbb4c1b
-  - 验证：Task 10 独立 Review PASS（Critical 0、Important 0、Minor 1）；合并后 pnpm lint、pnpm format:check、pnpm typecheck、pnpm test（43 files，289 passed，2 skipped）、pnpm build、git diff --check 均 exit 0；关键 11 files 定向集成测试 126 passed；隔离临时 SQLite 两次 pnpm db:migrate 均 exit 0，`PRAGMA integrity_check=ok`、`foreign_keys=1`、`journal_mode=wal`、`busy_timeout=5000`。
-  - 结果：完成 M2 后端闭环：真实 JPEG 上传/识别/材料确认/ABV Guard/READY、恰好 A/B/C、Zod、Task 4 Safety 最终裁决、BLOCK 修复或 fallback、推荐排序、RECIPE_SELECTION、GET 恢复、选择和 MIXING；Final Integration Review PASS（Critical 0、Important 0、Minor 0）。
-  - 风险：pnpm test:e2e 真实结果为 exit 1 `Error: No tests found`，未越界实现 Task 11；build 保留既有 Next/Turbopack `UPLOAD_DIR` 动态追踪 warning；未调用真实 Qwen 网络，真实手机验证留后续任务。Task 11 只允许从本次文档收尾提交后的最终 HEAD 启动。
-
-- 2026-08-26 | Task 11 | implementation 9c8a8b8e5aa31506022e7dcb011bb2b29d3bad53；fixes d86e3e1fe358329bb656642799293802ed458856、2d79fc797d9024b45809537602d200ac5de27d74；integration fast-forward
-  - 验证：独立 Reviewer 最终 PASS（Critical 0、Important 0、Minor 1）；Task 11 定向测试 8 files、32 passed；pnpm typecheck、pnpm lint（0 errors、1 个既有 `<img>` warning）、pnpm format:check、pnpm test（50 files、317 passed、2 skipped）、pnpm build（exit 0、1 个既有 `UPLOAD_DIR` tracing warning）、git diff --check 均 exit 0。
-  - 结果：完成手机偏好、拍照、识别和材料确认流程；390×844 浏览器验证覆盖偏好 → 拍照 → 识别 → CONFIRM、真实图片预览、CONFIRM 刷新恢复材料、503 精确重试不重复上传、SCAN 同阶段版本冲突重新上传并恢复、CTA 触控高度 48px。
-  - 风险：未测试真实 Android/iOS 相机硬件；仓库暂时没有 E2E；Provider 失败场景采用注入/fallback 验证；保留既有 `<img>` 与 `UPLOAD_DIR` warning。
-
-- 2026-08-27 | Task 12 | implementation 41078216e0bb1ee069d318da9c625b0bf483323f；fixes abd48c40162dc95e5a731ad96dfe82b22eafbc26、7fa313ad58366866273059287ad40c035fd7f07d；integration fast-forward to 7fa313ad58366866273059287ad40c035fd7f07d
-  - 验证：Reviewer 最终 PASS（Critical 0、Important 0；缓存问题 FIXED）；migration 文件与 journal 顺序完整（0000–0005）；全新临时 SQLite 执行全部 6 条 migration，迁移记录 6 行、外键违规 0；pnpm typecheck、pnpm lint（0 errors、3 warnings）、pnpm format:check、pnpm test（58 files、349 passed、2 skipped）、pnpm build、git diff --check 均 exit 0；pnpm test:e2e 为 exit 1 `Error: No tests found`，仓库暂时没有 E2E，按约定不阻塞。
-  - 结果：完成三卡选择与分步调饮；关键路径为拍照优先、允许暂时跳过；照片支持预览、失败重试、替换和刷新恢复；最终修复提交为 `7fa313ad`，完整历史以 fast-forward 集成。
-  - Accepted Known Risk：数据库已经提交照片替换后，如果删除旧磁盘文件这一极端操作失败，可能遗留一个无用旧文件。Demo 阶段接受该风险，暂不实现 outbox/reconciliation；不影响当前用户流程和数据库有效照片记录，后续视需要处理。
-  - 风险：保留既有 `<img>` lint warnings 与 `UPLOAD_DIR` tracing warning；未实现或开始 Task 13。
-
-- 2026-08-28 | Task 13A/13B 后端基线冻结 | 功能集成提交 `64f45e8f6596f71628a34d52b9fbc7e26d13a482`
-  - 结果：Task 13A 数据与版本链底座完成并通过独立审查；Task 13B 后端反馈调整闭环完成并通过独立审查。
-  - Review：Reviewer 首轮发现 4 个 Important，已由提交 `64f45e8f6596f71628a34d52b9fbc7e26d13a482` 修复，并通过聚焦复审。
-  - 决策：原计划中的旧 Task 13C 已由产品负责人取消/废止，不再实现；不得勾选或宣称旧 13C 已完成。
-  - 范围：当前冻结的是可复用的后端基线，不表述为旧版完整 UI 已完成。Swipe、三张拒绝后换一批、Mixing redesign 和新 Final Photo UI 均未在本仓库实现；后续 Product Pivot 将在独立新项目中重新规划。
-  - 已知验证缺口：仓库没有可执行 E2E 测试文件；`pnpm test:e2e` 的 `No tests found` 结果按既定规则记录为非阻塞缺口。
-
-## Decision Log
-
-按以下格式追加：
+按以下格式追加 Product Pivot 期间的真实决策：
 
 ```text
 YYYY-MM-DD | 决策标题
@@ -915,58 +427,28 @@ YYYY-MM-DD | 决策标题
 后果：
 ```
 
-已冻结决策：
+已冻结：
 
-- 2026-08-21 | 模块化单体
-  - 背景：单机、本地、短周期 MVP。
-  - 选择：一个 Next.js 进程 + SQLite + 本地上传。
-  - 替代方案：微服务、独立 Express、云后端。
-  - 后果：开发和部署简单；公网与多实例留到后续迁移。
+- 2026-08-28 | 初次生成仍为三卡，Swipe 只是浏览
+  - 背景：产品需要单卡手机交互，但后端已有稳定 A/B/C batch 合同。
+  - 选择：每次初次生成或换批调用 `generate()` 返回恰好 A/B/C；前端逐张展示，右滑才选择。
+  - 替代方案：每次左滑实时生成一张，或把 Provider 改成单候选返回；均不采用。
+  - 后果：新 regenerate 必须是显式用户动作，且每批重新过 Zod、Safety 和 recommendation ranking。
 
-- 2026-08-21 | 双层决策
-  - 背景：既要创意，又不能让模型决定安全底线。
-  - 选择：Agent 创意层 + 确定性 Safety 最终否决。
-  - 替代方案：纯检索、纯 LLM 判断。
-  - 后果：规则要维护证据和版本；所有路径都必须调用 Safety。
+- 2026-08-28 | 满意优先与可选 final drink
+  - 背景：饮后反馈应先降低填写负担，满意用户不需要被迫进入调整表单。
+  - 选择：FEEDBACK 先问“满意吗？”；满意后 final drink 可拍可跳过，两条路径均完成；不满意才进入四维 Vn+1。
+  - 替代方案：所有用户先填写四维反馈，或新增 FINAL_PHOTO 状态；均不采用。
+  - 后果：现有 Feedback/Adjustment 后端复用，UI 需要清晰区分满意收尾、proposal 和 current recipe。
 
-- 2026-08-21 | 半开放识别
-  - 背景：固定白名单太笨，完全开放难以约束。
-  - 选择：模型自由识别、受控类别归一、用户强制确认。
-  - 替代方案：全白名单、完全自由名称。
-  - 后果：数据保留 raw/canonical/category/confidence/confirmed 多个维度。
+- 2026-08-28 | 旧 checkpoint 能力保留但退出新版 Mixing 主路径
+  - 背景：旧 migration 和数据可能已存在，产品 Pivot 不应破坏历史数据。
+  - 选择：保留旧字段、数据、route 和 migration；新版 Mixing Stepper 不要求或使用 checkpoint photo。
+  - 替代方案：删除旧 migration 或将过程照继续设为必经节点；均不采用。
+  - 后果：Task 4 只改 UI/主路径，旧数据兼容测试继续保留。
 
-- 2026-08-21 | 固定三策略
-  - 背景：需要稳定展示比较和 Agent 创造性。
-  - 选择：A 保守、B 创意、C 最多补 2 种常见材料。
-  - 替代方案：动态数量、只给一套。
-  - 后果：Provider、校验、UI 和 fallback 都必须恰好三套。
-
-- 2026-08-21 | 结构化实验记忆
-  - 背景：需要保存反馈学习，但不需要复杂检索。
-  - 选择：recipe/feedback/version/memory 关系表与 JSON 标签。
-  - 替代方案：向量数据库/RAG、完全不保存。
-  - 后果：可解释、可测试；未来再评估语义检索。
-
-- 2026-08-21 | 搜索仅作灵感
-  - 背景：用户希望参考成熟公开方案，同时保留原创性。
-  - 选择：可选 SearchProvider + 来源摘要 + 本地降级。
-  - 替代方案：Playwright 抓小红书、完全无搜索。
-  - 后果：搜索不会阻断流程，也不会成为 Safety 证据入口。
-
-- 2026-08-23 | 幂等记录最小前向扩展
-  - 背景：Task 6 创建会话没有既有 sessionId，但现有 idempotency_records 只按 session 内 requestId 唯一，无法保证全局创建幂等。
-  - 选择：在现有表增加 request_fingerprint，将 request_id 改为全局唯一，保持 session_id NOT NULL；创建前生成 sessionId，并在同一事务写入 session 与幂等记录。
-  - 替代方案：新增独立 session_creation_idempotency 表，或允许 session_id nullable；均未采用。
-  - 后果：不增加独立表；历史记录指纹以 legacy:<id> 保守回填，无法重建原始请求内容的旧重试会返回幂等键冲突。
-
-- 2026-08-23 | 初次三套与单配方 Vn 迭代
-  - 背景：初次生成需要稳定的 A/B/C 比较体验，但用户反馈应聚焦当前已选配方，而不是再次产生无关候选。
-  - 选择：`generate()` 初次固定返回 `RecipeCandidateSet` 的 A/B/C 三套，用户选择一套作为 V1；每次独立调整请求只返回一个当前配方的下一版本 Vn+1，并关联 `parentRecipeId` 与本次 `feedbackId`，重新经过 Schema 和确定性 Safety。
-  - 替代方案：调整阶段返回多套候选、把版本链截断在首个下一版本，或在服务端自动无限循环调整；均不采用。
-  - 后果：版本链支持 V1 → V2 → V3 → … → Vn；用户接受下一版本后继续 MIXING，满意或不再调整时 COMPLETED；Task 13 必须覆盖连续版本和反馈关联。
-
-- 2026-08-28 | 旧 Task 13C 取消与后端基线冻结
-  - 背景：Task 13A/13B 已完成并通过独立审查，产品负责人取消旧 13C，并将后续 Product Pivot 放到独立新项目。
-  - 选择：冻结当前可复用后端基线；旧工程不实现旧 13C、Product Pivot、Swipe、三张拒绝后换一批、Mixing redesign 或新 Final Photo UI。
-  - 替代方案：继续按旧计划开发 13C 或在旧工程提前实现 Product Pivot；均不采用。
-  - 后果：旧工程不得表述为完整 UI 已完成；旧 13C 保持未完成且废止，后续新项目另行规划。
+- 2026-08-28 | Regenerate API 待产品负责人决定
+  - 背景：现有 `generateRecipeSet` 主要服务 READY 首次生成，RECIPE_SELECTION 换批需要新的业务语义。
+  - 选择：Task 3 先比较扩展既有 POST 与新增 regenerate Route/use case；在用户决定前不实现任一方案。
+  - 替代方案：Codex 直接选择一个 API 方案；不采用。
+  - 后果：Task 3 是实现前的明确决策门，不能以 UI 细节绕过后端语义。
