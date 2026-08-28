@@ -31,6 +31,10 @@ export function SessionShell(_props: SessionShellProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  function handleReload() {
+    window.location.reload();
+  }
+
   useEffect(() => {
     let active = true;
     void client
@@ -124,42 +128,59 @@ export function SessionShell(_props: SessionShellProps) {
 
   if (isLoading || snapshot === null) {
     return (
-      <main className="min-h-screen bg-stone-100 px-5 py-6 text-stone-900">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
-          {errorMessage === null ? (
-            <p role="status" aria-live="polite">
-              正在恢复会话…
-            </p>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-sm leading-6 text-red-800" role="alert">
-                {errorMessage}
-              </p>
-              <button
-                className="min-h-11 rounded-2xl bg-stone-900 px-5 py-3 font-semibold text-white"
-                type="button"
-                onClick={() => window.location.reload()}
-              >
-                重新加载
-              </button>
-            </div>
-          )}
-        </section>
+      <main
+        className="mobile-shell"
+        aria-label="调饮实验"
+        aria-busy={isLoading || snapshot === null}
+      >
+        <div className="mobile-shell__inner">
+          <section className="mobile-surface space-y-5 p-6" aria-label="会话恢复">
+            {errorMessage === null ? (
+              <div className="space-y-3">
+                <p className="mobile-eyebrow">调饮实验</p>
+                <p role="status" aria-live="polite" className="font-semibold text-stone-900">
+                  正在恢复会话…
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="mobile-notice mobile-notice--error" role="alert">
+                  <span className="mobile-notice__label">会话恢复失败</span>
+                  <span>{errorMessage}</span>
+                </div>
+                <button
+                  className="mobile-action mobile-action--primary w-full"
+                  type="button"
+                  onClick={handleReload}
+                >
+                  重新加载会话
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-stone-100 px-5 py-6 pb-8 text-stone-900">
-      <div className="mx-auto max-w-md space-y-6">
+    <main className="mobile-shell" aria-label="调饮实验" aria-busy={isGenerating}>
+      <div className="mobile-shell__inner">
         <ProgressHeader state={snapshot.session.state} />
         {errorMessage !== null ? (
-          <div
-            className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800"
-            role="alert"
-          >
-            {errorMessage}
-          </div>
+          <section className="mobile-notice mobile-notice--error space-y-3" role="alert">
+            <div>
+              <span className="mobile-notice__label">当前操作没有完成</span>
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              className="mobile-action mobile-action--secondary w-full"
+              type="button"
+              onClick={handleReload}
+            >
+              重新加载会话
+            </button>
+          </section>
         ) : null}
         {snapshot.session.state === "PREFERENCES" ? (
           <PreferencesScreen
@@ -206,17 +227,15 @@ export function SessionShell(_props: SessionShellProps) {
             }}
           />
         ) : snapshot.session.state === "READY" ? (
-          <section className="space-y-5 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
-            <div className="space-y-3">
-              <p className="text-sm font-medium tracking-wide text-amber-700">第四步 · 生成</p>
-              <h1 className="text-3xl leading-tight font-semibold">生成三套配方</h1>
-              <p className="leading-7 text-stone-600">
-                系统会基于已确认材料生成 A / B / C 三套方案。生成后你仍需主动比较和选择。
-              </p>
+          <section className="mobile-surface space-y-5 p-6">
+            <div className="mobile-page-header">
+              <p className="mobile-eyebrow">第四步 · 生成</p>
+              <h1>生成三套配方</h1>
+              <p>系统会基于已确认材料生成 A / B / C 三套方案。生成后你仍需主动比较和选择。</p>
             </div>
             <button
               type="button"
-              className="min-h-11 w-full rounded-2xl bg-stone-900 px-5 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+              className="mobile-action mobile-action--primary w-full"
               disabled={isGenerating}
               onClick={() => void handleGenerateRecipeSet()}
             >
@@ -225,11 +244,7 @@ export function SessionShell(_props: SessionShellProps) {
           </section>
         ) : snapshot.session.state === "RECIPE_SELECTION" ? (
           recipeSet === null ? (
-            <section
-              role="status"
-              aria-live="polite"
-              className="rounded-3xl bg-white p-6 shadow-sm"
-            >
+            <section role="status" aria-live="polite" className="mobile-surface p-6">
               正在恢复配方方案…
             </section>
           ) : (
@@ -257,11 +272,7 @@ export function SessionShell(_props: SessionShellProps) {
           )
         ) : snapshot.session.state === "MIXING" ? (
           recipeSet === null ? (
-            <section
-              role="status"
-              aria-live="polite"
-              className="rounded-3xl bg-white p-6 shadow-sm"
-            >
+            <section role="status" aria-live="polite" className="mobile-surface p-6">
               正在恢复调饮步骤…
             </section>
           ) : (
@@ -270,7 +281,7 @@ export function SessionShell(_props: SessionShellProps) {
                 (recipe) => recipe.id === snapshot.data.selectedRecipeId,
               );
               return selectedRecipe === undefined ? (
-                <section role="alert" className="rounded-3xl bg-white p-6 text-red-800 shadow-sm">
+                <section role="alert" className="mobile-notice mobile-notice--error">
                   当前选择的配方无法恢复，请重新加载服务端会话。
                 </section>
               ) : (
@@ -331,10 +342,7 @@ export function SessionShell(_props: SessionShellProps) {
             })()
           )
         ) : (
-          <section
-            className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200"
-            role="status"
-          >
+          <section className="mobile-surface p-6" role="status">
             <h1 className="text-2xl font-semibold">当前状态：{snapshot.session.state}</h1>
             <p className="mt-3 leading-7 text-stone-600">下一阶段界面将在后续任务接入。</p>
           </section>

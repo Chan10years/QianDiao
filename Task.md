@@ -107,10 +107,10 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 先补视觉契约测试：390×844 视口下 shell、主 CTA 和错误恢复语义。
-- [ ] 运行目标测试确认 RED，记录失败断言。
-- [ ] 实现最小 tokens、布局和壳层，不改变 API payload。
-- [ ] 运行组件测试及质量门禁，修正真实失败。
+- [x] 先补视觉契约测试：390×844 视口下 shell、主 CTA 和错误恢复语义。
+- [x] 运行目标测试确认 RED，记录失败断言。
+- [x] 实现最小 tokens、布局和壳层，不改变 API payload。
+- [x] 运行组件测试及质量门禁，修正真实失败。
 - [ ] 提交后交 Claude Code 独立 Review。
 
 **Acceptance:** PREFERENCES/SCAN/CONFIRM/READY/RECIPE_SELECTION/MIXING 等既有状态共享可读的手机壳；按钮触控区域达到项目既定要求；加载、失败、重试和刷新恢复可见；业务测试合同不变。
@@ -421,6 +421,10 @@ YYYY-MM-DD | Task N | commit <sha>
   - 验证：已完成规定文档读取、冻结 baseline/结构调查、旧 Task 原样归档；本轮运行 `git diff --check`、当前文档 targeted Prettier check 和范围审计；完整 `pnpm format:check` 仅因 frozen archive 保持历史字节不变而报告格式警告。
   - 结果：已明确 Task 5/6 的 satisfied-closing、`accepted=true`、`completeSession` 和 `COMPLETED` 顺序；已补齐 Task 1–6 的非阻塞 E2E 缺口规则和 Task 2 ranking 稳定性前置调查；尚未开始任何 Product Pivot 生产代码。
   - 风险：GPT 独立 Reviewer 尚未重新审查；当前 baseline 的 `pnpm test:e2e` 已知为 `No tests found`，必须由 Task 7 补齐并在建立后恢复为阻塞门禁。
+- 2026-08-28 | Task 1 | implementation commit pending independent Review
+  - 验证：定向组件测试 5 files / 22 passed；`pnpm lint` 0 errors（3 个既有 `<img>` warnings）；Task 1 文件 Prettier check 通过；`pnpm typecheck` 通过；`pnpm test` 64 files / 390 passed / 2 skipped；`pnpm build` 通过；`pnpm test:e2e` 返回 `No tests found`；390×844 与 320px 浏览器几何检查通过。
+  - 结果：建立白瓷/米纸/酒液琥珀视觉 tokens、统一 Mobile Shell、进度语义、FixedActionBar safe-area/内容 reserve、Preferences/Scan/Confirmation 共享页面结构与 loading/error/recovery 表达；未改变既有业务 payload 和状态推进。
+  - 风险：完整 `pnpm format:check` 仍被未修改的 `docs/baseline/Task-frozen-pre-pivot.md` 历史格式警告阻塞；浏览器 CLI 在当前 Windows 受限环境无法启动，改用 Chrome CDP 设备指标完成真实页面检查；独立 Reviewer 尚未审查。
 
 ## Decision log
 

@@ -62,25 +62,21 @@ export function PreferencesScreen({
   }
 
   return (
-    <form className="space-y-8 pb-32" onSubmit={handleSubmit}>
-      <div className="space-y-3">
-        <p className="text-sm font-medium tracking-wide text-amber-700">第一步 · 口味</p>
-        <h1 className="text-3xl leading-tight font-semibold text-stone-900">你想喝什么感觉？</h1>
-        <p className="leading-7 text-stone-600">
-          四个维度各选五档。这里记录的是你的绝对偏好，之后可以根据成品反馈继续调整。
-        </p>
-      </div>
+    <form className="mobile-screen space-y-8" onSubmit={handleSubmit}>
+      <header className="mobile-page-header">
+        <p className="mobile-eyebrow">第一步 · 口味</p>
+        <h1>你想喝什么感觉？</h1>
+        <p>四个维度各选五档。这里记录的是你的绝对偏好，之后可以根据成品反馈继续调整。</p>
+      </header>
 
       {errorMessage !== null ? (
-        <div
-          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800"
-          role="alert"
-        >
-          {errorMessage}
+        <div className="mobile-notice mobile-notice--error" role="alert">
+          <span className="mobile-notice__label">保存没有完成</span>
+          <span>{errorMessage}</span>
         </div>
       ) : null}
 
-      <div className="space-y-7 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-200">
+      <div className="mobile-surface space-y-7 p-5">
         {sliderDefinitions.map((definition) => (
           <TasteSlider
             key={definition.key}
@@ -98,9 +94,10 @@ export function PreferencesScreen({
 
       <FixedActionBar>
         <button
-          className="min-h-11 w-full rounded-2xl bg-stone-900 px-5 py-3 text-base font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-400"
+          className="mobile-action mobile-action--primary w-full"
           type="submit"
           disabled={isSubmitting}
+          aria-busy={isSubmitting}
         >
           {isSubmitting ? "正在保存…" : "保存口味，开始拍照"}
         </button>

@@ -89,36 +89,32 @@ export function CameraScreen({
   }
 
   return (
-    <section className="space-y-6 pb-32">
-      <div className="space-y-3">
-        <p className="text-sm font-medium tracking-wide text-amber-700">第二步 · 识别</p>
-        <h1 className="text-3xl leading-tight font-semibold text-stone-900">拍照桌面材料</h1>
-        <p className="leading-7 text-stone-600">
+    <section className="mobile-screen space-y-6">
+      <header className="mobile-page-header">
+        <p className="mobile-eyebrow">第二步 · 识别</p>
+        <h1>拍照桌面材料</h1>
+        <p>
           把酒和想加入的材料放在同一张桌面总览图里。识别结果只作为草稿，下一步可以逐项修改和确认。
         </p>
-      </div>
+      </header>
 
       {errorMessage !== null ? (
-        <div
-          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800"
-          role="alert"
-        >
-          {errorMessage}
+        <div className="mobile-notice mobile-notice--error" role="alert">
+          <span className="mobile-notice__label">识别没有完成</span>
+          <span>{errorMessage}</span>
         </div>
       ) : null}
 
       {successMessage !== null ? (
-        <p
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800"
-          role="status"
-        >
-          {successMessage}
+        <p className="mobile-notice mobile-notice--success" role="status">
+          <span className="mobile-notice__label">识别完成</span>
+          <span>{successMessage}</span>
         </p>
       ) : null}
 
-      <div className="space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-200">
+      <div className="mobile-surface space-y-4 p-5">
         <label
-          className="flex min-h-11 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-stone-300 px-5 py-3 text-center font-medium text-stone-800 hover:border-amber-600 hover:bg-amber-50"
+          className="mobile-action mobile-action--secondary w-full cursor-pointer border-dashed"
           htmlFor="overview-image"
         >
           {file === null ? "打开相机或选择照片" : "替换照片"}
@@ -151,9 +147,10 @@ export function CameraScreen({
 
       <FixedActionBar>
         <button
-          className="min-h-11 w-full rounded-2xl bg-stone-900 px-5 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+          className="mobile-action mobile-action--primary w-full"
           type="button"
           disabled={file === null || stage !== "idle"}
+          aria-busy={stage !== "idle"}
           onClick={() => void handleSubmit()}
         >
           {stage === "uploading"

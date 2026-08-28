@@ -74,21 +74,17 @@ export function IngredientConfirmationScreen({
   }
 
   return (
-    <section className="space-y-6 pb-32">
-      <div className="space-y-3">
-        <p className="text-sm font-medium tracking-wide text-amber-700">第三步 · 人工确认</p>
-        <h1 className="text-3xl leading-tight font-semibold text-stone-900">确认材料</h1>
-        <p className="leading-7 text-stone-600">
-          识别模型只负责猜测。请逐项核对、编辑或删除；没有确认的事实不会进入配方生成。
-        </p>
-      </div>
+    <section className="mobile-screen space-y-6">
+      <header className="mobile-page-header">
+        <p className="mobile-eyebrow">第三步 · 人工确认</p>
+        <h1>确认材料</h1>
+        <p>识别模型只负责猜测。请逐项核对、编辑或删除；没有确认的事实不会进入配方生成。</p>
+      </header>
 
       {errorMessage !== null ? (
-        <div
-          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800"
-          role="alert"
-        >
-          {errorMessage}
+        <div className="mobile-notice mobile-notice--error" role="alert">
+          <span className="mobile-notice__label">确认没有保存</span>
+          <span>{errorMessage}</span>
         </div>
       ) : null}
 
@@ -111,7 +107,7 @@ export function IngredientConfirmationScreen({
       </div>
 
       <button
-        className="min-h-11 w-full rounded-2xl border border-stone-300 bg-white px-5 py-3 font-semibold text-stone-800 hover:bg-stone-50"
+        className="mobile-action mobile-action--secondary w-full"
         type="button"
         onClick={() => setIngredients((current) => [...current, { ...emptyIngredient }])}
       >
@@ -119,10 +115,7 @@ export function IngredientConfirmationScreen({
       </button>
 
       {reasons.length > 0 ? (
-        <div
-          className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"
-          role="status"
-        >
+        <div className="mobile-notice mobile-notice--warning" role="status">
           <p className="font-semibold">还不能继续：</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {reasons.map((reason) => (
@@ -134,9 +127,10 @@ export function IngredientConfirmationScreen({
 
       <FixedActionBar>
         <button
-          className="min-h-11 w-full rounded-2xl bg-stone-900 px-5 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+          className="mobile-action mobile-action--primary w-full"
           type="button"
           disabled={!canContinue}
+          aria-busy={isSubmitting}
           onClick={() => void handleConfirm()}
         >
           {isSubmitting ? "正在保存确认…" : "确认材料并继续"}
