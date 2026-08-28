@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+AGENTS.md
+PRODUCTION.md
+Task.md
+2026-08-21-baijiu-cocktail-agent-design.md
