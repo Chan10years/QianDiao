@@ -167,7 +167,7 @@ UI → API → Application → Domain/Workflow/Agent/Safety
 
 ## 11. 完成与验证门禁
 
-任何任务完成前运行其局部测试。任何里程碑完成前必须全部通过：
+任何任务完成前运行其局部测试。E2E 尚未建立期间的 Task 1–6 按下方分阶段规则执行；Task 7 及之后的代码里程碑和最终发布必须全部通过：
 
 ```bash
 pnpm lint
@@ -180,7 +180,7 @@ pnpm build
 
 涉及数据库时，还要从空数据库运行迁移；涉及手机体验时，还要按 `PRODUCTION.md` 在真实手机上完成指定 smoke test。
 
-当前 Frozen Baseline 的已知 E2E 缺口是：`pnpm test:e2e` 返回 `No tests found`。这只说明 baseline 尚未建立可执行 E2E，不是最终 Demo 的通过结果；新版完整闭环必须在 Task 7 补齐 Playwright E2E，建立后 `pnpm test:e2e` 重新成为阻塞发布门禁。
+E2E 分阶段规则：Task 7 建立可执行 E2E 前，Frozen Baseline 的 `pnpm test:e2e` 返回 `No tests found` 是已知的非阻塞缺口，不阻塞 Task 1–6 的 task gate。Task 7 必须建立真实可执行的 Playwright E2E，Task 7 验收不接受 `No tests found`。Task 7 建立后，`pnpm test:e2e` 重新成为 Task 7、Task 8 和最终发布的阻塞门禁；`PRODUCTION.md` 的最终 release gate 继续要求 E2E 全绿。
 
 完成报告必须给出：
 

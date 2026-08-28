@@ -32,6 +32,10 @@
 - 不安装新依赖，除非先更新正式规格和本计划并取得用户确认。
 - 每个实现 Task 遵循 Red → Green → Review → Green 修复循环；Codex 与 Claude Code 不同时写同一代码。
 
+## E2E 分阶段规则
+
+Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test:e2e` 返回 `No tests found` 是已知的非阻塞缺口，不阻塞 Task 1–6 的 task gate。Task 7 必须建立真实可执行 Playwright E2E，不接受 `No tests found`；建立后 `pnpm test:e2e` 对 Task 7、Task 8 和最终 release 都是阻塞门禁。`PRODUCTION.md` 的最终 release gate 继续要求 E2E 全绿。
+
 ## Review protocol
 
 每一个实现 Task 的固定门禁：
@@ -131,12 +135,15 @@
 - Modify only if required by existing method typing: `src/infrastructure/http/session-client.ts`
 - Test: `tests/components/recipes/recipe-selection-screen.test.tsx`
 - Create if needed: `tests/components/recipes/recipe-swipe-deck.test.tsx`
+- Investigate only before implementation: `src/application/get-recipe-set.ts`, `src/repositories/recipe-repository.ts`, `src/infrastructure/repositories/drizzle-recipe-repository.ts`
 - Preserve backend contracts: `src/application/generate-recipe-set.ts`, `src/application/select-recipe.ts`, `app/api/sessions/[sessionId]/recipes/route.ts`, `app/api/sessions/[sessionId]/selection/route.ts`
 
-**Tests:** 初始顺序为 ranking 第一名；始终只有一张可见卡；左滑只更新本地 deck index 且 client spy 无调用；右滑只调用 `selectRecipe`；WARN 未确认不能右滑；最后一张左滑显示“换一批”入口但不调用 regenerate。
+**Tests:** 初始顺序为 recommendation ranking 第一名；始终只有一张可见卡；左滑只更新本地 deck index 且 client spy 无调用；右滑只调用 `selectRecipe`；WARN 未确认不能右滑；最后一张左滑显示“换一批”入口但不调用 regenerate。实现前还必须验证 `generate` response → GET recipe set → Repository 持久化读取的顺序稳定保持 recommendation-ranked order；不得重新按 A/B/C 排序。
 
 **Steps:**
 
+- [ ] 实现前验证 `generate` response、GET recipe set 和 Repository 持久化读取之间的顺序，确认 recommendation-ranked order 稳定传递；不得重新按 A/B/C 排序。
+- [ ] 如果无法证明 ranking 顺序稳定，先停止 Task 2 UI 实现，在 Decision Log 报告最小稳定暴露方案（例如由服务端持久化或返回显式 ranking position），取得用户最终决定后再写 UI RED 测试。
 - [ ] 从当前 ranking 输出和组件行为写 RED 测试，禁止测试依赖 A/B/C 顺序。
 - [ ] 运行定向组件测试确认 RED。
 - [ ] 实现最小本地 deck cursor、手势/键盘等价操作和右滑选择。
@@ -230,11 +237,11 @@
 
 ## Task 5: Satisfaction-first Feedback & Adjustment UI
 
-**Goal:** 在 FEEDBACK 首先询问“满意吗？”，只有“还想调整”才展示四维相对反馈，并接通已完成的 Vn+1 后端闭环。
+**Goal:** 在 FEEDBACK 首先询问“满意吗？”；“满意”只进入客户端 `satisfied-closing` phase，“还想调整”才展示四维相对反馈并接通已完成的 Vn+1 后端闭环。
 
-**Scope:** 满意/还想调整首屏、四维 `-2..+2` 调整、可选备注、保存反馈、生成唯一 proposal、接受 proposal 后重新 MIXING；显示版本和 Safety 摘要，处理错误/重试/409。
+**Scope:** 满意/还想调整首屏、客户端 `satisfied-closing` phase、四维 `-2..+2` 调整、可选备注、`accepted=false` 反馈保存、生成唯一 proposal、接受 proposal 后重新 MIXING；显示版本和 Safety 摘要，处理错误/重试/409。
 
-**Explicit non-scope:** 不新增 Feedback/Adjustment 数据模型或 SessionState；不做三张全拒绝原因调查；不修改 13A/13B 后端合同，除非测试证明现有 UI adapter 无法合法调用且先记录决策；不实现 final photo 收尾细节。
+**Explicit non-scope:** 不在本 Task 保存 `accepted=true`、不调用 `completeSession`、不推进 `COMPLETED`；不实现 satisfied-closing 后的 final drink 拍摄/跳过，该职责属于 Task 6；不新增 Feedback/Adjustment 数据模型或 SessionState；不做三张全拒绝原因调查；不修改 13A/13B 后端合同，除非测试证明现有 UI adapter 无法合法调用且先记录决策。
 
 **Files:**
 
@@ -245,7 +252,7 @@
 - Test: `tests/integration/application/feedback-adjustment.test.ts`, `tests/integration/api/task-13-feedback-routes.test.ts`
 - Create: `tests/components/feedback/satisfaction-screen.test.tsx`, `tests/components/feedback/adjustment-screen.test.tsx`
 
-**Tests:** FEEDBACK 首屏只显示满意/还想调整；满意不先显示四维滑杆；不满意显示四维和备注；保存 accepted=true/false 对应合法状态；只生成一张 Vn+1；proposal 未接受前 current recipe 不替换；接受后 currentStep 重置并进入 MIXING；V2/V3 版本链可持续。
+**Tests:** FEEDBACK 首屏只显示满意/还想调整；点击满意只进入客户端 `satisfied-closing` phase，不调用 `saveFeedback`、不调用 `completeSession`、不保存 `accepted=true`、不进入 `COMPLETED`；满意 phase 不先显示四维滑杆；点击还想调整才显示四维和备注，并调用 `saveFeedback(accepted=false)` 进入 `ADJUSTMENT`；只生成一张 Vn+1；proposal 未接受前 current recipe 不替换；接受后 currentStep 重置并进入 MIXING；V2/V3 版本链可持续。
 
 **Steps:**
 
@@ -255,7 +262,7 @@
 - [ ] 运行定向测试、全量 Vitest 和质量门禁。
 - [ ] 提交并等待独立 Review。
 
-**Acceptance:** 满意不被迫填写详细 feedback；不满意才出现四维调整；Vn+1 只针对当前实际配方生成并经既有 Safety；接受后回到 MIXING；不能通过 UI 绕过状态机或 BLOCK。
+**Acceptance:** 满意只进入客户端 satisfied-closing phase，不保存 `accepted=true`、不调用 `completeSession`、不推进 `COMPLETED`；不满意才出现四维调整并保存 `accepted=false`；Vn+1 只针对当前实际配方生成并经既有 Safety；接受后回到 MIXING；不能通过 UI 绕过状态机或 BLOCK。
 
 **Verification:** 组件、应用、API 测试，`pnpm test`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck`，以及刷新后 FEEDBACK/ADJUSTMENT 恢复路径。
 
@@ -265,9 +272,9 @@
 
 ## Task 6: Optional Final Drink Photo & Completed UI
 
-**Goal:** 在满意路径中提供可选 final drink 拍摄，并保证拍摄成功或明确跳过都能完成会话。
+**Goal:** 接手 Task 5 的 `satisfied-closing` phase，提供可选 final drink 拍摄，并在拍摄成功或明确跳过后保存满意反馈并完成会话。
 
-**Scope:** 满意后的 final drink 邀请、相机/文件选择、预览、上传失败重试、跳过、Completed 页面和完成状态恢复；复用 `final_drink` image role、现有上传安全和 Feedback/complete 后端能力。
+**Scope:** 接手 satisfied-closing；提供满意后的 final drink 邀请、相机/文件选择、预览、上传失败重试、跳过；在用户拍摄或跳过后调用 `saveFeedback(accepted=true, finalImageId=uuid|null)`，再调用 `completeSession`，展示 Completed 页面并支持完成状态恢复；复用 `final_drink` image role、现有上传安全和 Feedback/complete 后端能力。
 
 **Explicit non-scope:** 不新增 `FINAL_PHOTO` SessionState；不把 final photo 设为必填；不实现分享、海报、社交、质量/医学判断；不删除旧 checkpoint image 数据。
 
@@ -279,7 +286,7 @@
 - Test: `tests/components/feedback/final-drink-photo.test.tsx`, `tests/components/session/completed-screen.test.tsx`
 - Extend: `tests/integration/api/task-13-feedback-routes.test.ts`, `tests/integration/application/feedback-adjustment.test.ts`
 
-**Tests:** final drink 上传成功关联 `finalImageId`；上传失败可以重试或跳过；跳过保存 null 仍进入 COMPLETED；满意带照和满意无照两条路径都可 refresh 恢复到 Completed；final photo 失败不破坏反馈记录；不出现新状态。
+**Tests:** Task 5 的 satisfied-closing 在 final drink 选择前不保存满意反馈；final drink 上传成功后保存 `accepted=true` 和 UUID `finalImageId`，再调用 `completeSession` 进入 COMPLETED；上传失败可以重试或跳过；跳过先保存 `accepted=true` 和 `finalImageId=null`，再调用 `completeSession` 进入 COMPLETED；满意带照和满意无照两条路径都可 refresh 恢复到 Completed；final photo 失败不破坏可跳过的满意路径；不出现新状态。
 
 **Steps:**
 
@@ -289,7 +296,7 @@
 - [ ] 运行全量测试、质量门禁和真实浏览器两条满意路径。
 - [ ] 提交后由 Claude Code 独立 Review。
 
-**Acceptance:** 用户满意后可拍或跳过 final drink；上传失败仍有跳过出口；两条路径都合法进入 `COMPLETED`；没有 `FINAL_PHOTO` 状态或分享入口。
+**Acceptance:** 用户满意后由 Task 6 接手 satisfied-closing，可拍或跳过 final drink；在拍摄/跳过之后才保存 `accepted=true` 与 `finalImageId(uuid|null)`，再调用 `completeSession`；上传失败仍有跳过出口；两条路径都合法进入 `COMPLETED`；没有 `FINAL_PHOTO` 状态或分享入口。
 
 **Verification:** 定向组件/API/应用测试、`pnpm test`、`pnpm lint`、`pnpm format:check`、`pnpm typecheck` 和持久化浏览器路径。
 
@@ -410,10 +417,10 @@ YYYY-MM-DD | Task N | commit <sha>
 
 当前：
 
-- 2026-08-28 | Task 0 | Documentation Pivot implementation commit（独立 Review pending）
-  - 验证：已完成规定文档读取、冻结 baseline/结构调查、旧 Task 原样归档；提交前运行 `git diff --check`、Markdown format check（若适用）和范围审计。
-  - 结果：新 Product Pivot Spec、AGENTS、PRODUCTION、Task 0–8 和 frozen pre-pivot archive 已建立；尚未开始任何 Product Pivot 生产代码。
-  - 风险：Claude Code 独立 Reviewer 尚未审查；当前 baseline 的 `pnpm test:e2e` 已知为 `No tests found`，必须由 Task 7 补齐。
+- 2026-08-28 | Task 0 | Documentation Pivot review fix commit（GPT re-review pending）
+  - 验证：已完成规定文档读取、冻结 baseline/结构调查、旧 Task 原样归档；本轮运行 `git diff --check`、当前文档 targeted Prettier check 和范围审计；完整 `pnpm format:check` 仅因 frozen archive 保持历史字节不变而报告格式警告。
+  - 结果：已明确 Task 5/6 的 satisfied-closing、`accepted=true`、`completeSession` 和 `COMPLETED` 顺序；已补齐 Task 1–6 的非阻塞 E2E 缺口规则和 Task 2 ranking 稳定性前置调查；尚未开始任何 Product Pivot 生产代码。
+  - 风险：GPT 独立 Reviewer 尚未重新审查；当前 baseline 的 `pnpm test:e2e` 已知为 `No tests found`，必须由 Task 7 补齐并在建立后恢复为阻塞门禁。
 
 ## Decision log
 
@@ -437,7 +444,7 @@ YYYY-MM-DD | 决策标题
 
 - 2026-08-28 | 满意优先与可选 final drink
   - 背景：饮后反馈应先降低填写负担，满意用户不需要被迫进入调整表单。
-  - 选择：FEEDBACK 先问“满意吗？”；满意后 final drink 可拍可跳过，两条路径均完成；不满意才进入四维 Vn+1。
+  - 选择：Task 5 的“满意”只进入客户端 `satisfied-closing` phase；Task 6 接手并在 final drink 拍摄或跳过后保存 `accepted=true` 与 `finalImageId(uuid|null)`，再调用 `completeSession`；不满意才保存 `accepted=false` 并进入四维 Vn+1。
   - 替代方案：所有用户先填写四维反馈，或新增 FINAL_PHOTO 状态；均不采用。
   - 后果：现有 Feedback/Adjustment 后端复用，UI 需要清晰区分满意收尾、proposal 和 current recipe。
 
