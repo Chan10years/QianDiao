@@ -11,29 +11,20 @@ const strategyLabel: Record<RecipeDisplay["strategy"], string> = {
 interface RecipeCardProps {
   recipe: RecipeDisplay;
   recommended: boolean;
-  selected: boolean;
   warningAcknowledged: boolean;
-  onSelect: () => void;
   onWarningChange: (checked: boolean) => void;
 }
 
 export function RecipeCard({
   recipe,
   recommended,
-  selected,
   warningAcknowledged,
-  onSelect,
   onWarningChange,
 }: RecipeCardProps) {
   const isWarn = recipe.safety.level === "WARN";
-  const canSelect = !isWarn || warningAcknowledged;
 
   return (
-    <article
-      className={`space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ${
-        selected ? "ring-amber-500" : "ring-stone-200"
-      }`}
-    >
+    <article className="space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-200">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium tracking-wide text-amber-700">
@@ -92,20 +83,6 @@ export function RecipeCard({
           onChange={onWarningChange}
         />
       ) : null}
-
-      <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-stone-200 px-4 py-3 text-sm font-semibold text-stone-900">
-        <input
-          className="size-5 accent-stone-900"
-          type="radio"
-          name="recipe-choice"
-          value={recipe.id}
-          checked={selected}
-          disabled={!canSelect}
-          aria-label={`选择 ${recipe.title}`}
-          onChange={onSelect}
-        />
-        <span>{canSelect ? "选择这套方案" : "请先确认 WARN 提示"}</span>
-      </label>
     </article>
   );
 }

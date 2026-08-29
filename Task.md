@@ -142,11 +142,11 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 实现前验证 `generate` response、GET recipe set 和 Repository 持久化读取之间的顺序，确认 recommendation-ranked order 稳定传递；不得重新按 A/B/C 排序。
+- [x] 实现前验证 `generate` response、GET recipe set 和 Repository 持久化读取之间的顺序，确认 recommendation-ranked order 稳定传递；不得重新按 A/B/C 排序。
 - [ ] 如果无法证明 ranking 顺序稳定，先停止 Task 2 UI 实现，在 Decision Log 报告最小稳定暴露方案（例如由服务端持久化或返回显式 ranking position），取得用户最终决定后再写 UI RED 测试。
-- [ ] 从当前 ranking 输出和组件行为写 RED 测试，禁止测试依赖 A/B/C 顺序。
-- [ ] 运行定向组件测试确认 RED。
-- [ ] 实现最小本地 deck cursor、手势/键盘等价操作和右滑选择。
+- [x] 从当前 ranking 输出和组件行为写 RED 测试，禁止测试依赖 A/B/C 顺序。
+- [x] 运行定向组件测试确认 RED。
+- [x] 实现最小本地 deck cursor、手势/键盘等价操作和右滑选择。
 - [ ] 运行组件测试、全量 Vitest 和质量门禁。
 - [ ] 提交并等待独立 Review；不进入 Task 3 直到 PASS。
 
@@ -430,6 +430,10 @@ YYYY-MM-DD | Task N | commit <sha>
   - 浏览器：使用 fallback Provider、隔离 SQLite 和上传目录，在真实 390×844 与 320px viewport 验证 Preferences、Scan、Confirmation；保留真实四维 range、文件上传/识别/替换、材料 category/brand/ABV/confidence/confirmed/add/delete/guard；FixedActionBar 贴底且无水平溢出；reduced-motion media query 生效。
   - 结果：将 Prototype 的 paper/wine/cinnabar/green/gold tokens、Kai/Serif/Mono 字体角色、纸卡、背景装饰、Scan 场景和材料确认视觉整合进既有 Next.js 组件；保留 SessionShell、真实 API、`expectedVersion`、恢复与安全边界。修复 Task 1 Review 的三项旧 finding：Shell 成为 bottom reserve 唯一 owner，error recovery 不再错误保持 `aria-busy=true`，小号 accent text 改用深色语义 alias。
   - 风险：独立 Reviewer 尚未审查；未打包的霞鹜文楷继续依赖系统 fallback；build 保留既有 `UPLOAD_DIR` 动态文件追踪 warning；正式 Playwright E2E 仍由 Task 7 建立。Task 2–6 的业务行为未开始。
+- 2026-08-29 | Task 2 | implementation commit pending independent Review（branch `task-2-recipe-swipe-deck`）
+  - 验证：ranking 稳定性调查结论 STABLE——`rank-recipe-candidates` 输出的推荐第一名以 `recommendedRecipeId` 持久化，Repository 写入/读取保持 recipes 顺序，GET 返回原数组顺序；前端仅按 `recommendedRecipeId` 提位，不重新 sort。定向测试：`recipe-selection-screen.test.tsx` 7 passed（RED 曾 7 failed）、`tests/components/session` 7 passed、`pnpm typecheck` 通过。Hackathon Sprint Mode 下未运行全量 `pnpm test / lint / format:check / build / test:e2e`。
+  - 结果：实现单卡 Swipe Deck——首屏显示 recommendation ranking #1，左滑/“不要这杯”仅推进本地 deck cursor（零 client 调用），右滑/“选这杯”调用现有 `selectRecipe`（复用 requestId/expectedVersion/409 recovery），WARN 未确认禁用选择，BLOCK 卡只展示审计摘要不入 deck，三张全拒绝显示禁用“换一批”入口（Task 2 不实现 regenerate）；移除 RecipeCard 旧 radio 选择，保留点击等价操作与 reduced-motion。
+  - 风险：独立 Reviewer 尚未审查；全量门禁待统一执行；“换一批”按钮当前为禁用占位，真实 regenerate 属 Task 3；`session-shell.tsx` 无需修改。
 
 ## Decision log
 
