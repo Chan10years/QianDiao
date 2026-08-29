@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { SessionClient, SessionClientError } from "@/src/infrastructure/http/session-client";
+import { createRequestId, SessionClient, SessionClientError } from "@/src/infrastructure/http/session-client";
+
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const sessionResponse = {
   data: {
@@ -565,5 +567,50 @@ describe("SessionClient", () => {
     expect((secondBody as FormData).get("recipeId")).toBe(input.recipeId);
     expect((secondBody as FormData).get("stepIndex")).toBe("0");
     expect((secondBody as FormData).get("expectedVersion")).toBe("2");
+  });
+
+  it("creates valid v4 requestIds when crypto.randomUUID is available", () => {
+    const requestId = createRequestId();
+
+    expect(requestId).toMatch(UUID_V4_PATTERN);
+  });
+
+  it("falls back to crypto.getRandomValues for requestIds when randomUUID is missing", () => {
+    const originalCrypto = globalThis.crypto;
+    vi.stubGlobal("crypto", {
+      getRandomValues: originalCrypto.getRandomValues.bind(originalCrypto),
+    });
+
+    try {
+      const requestId = createRequestId();
+
+      expect(requestId).toMatch(UUID_V4_PATTERN);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("uses a valid default requestId for mutations without an injected factory", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(preferenceResponse), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const client = new SessionClient({ fetcher });
+
+    await client.savePreferences({
+      sessionId: sessionResponse.session.id,
+      expectedVersion: 0,
+      preferences: {
+        sweetness: 4 as const,
+        acidity: 2 as const,
+        alcoholIntensity: 3 as const,
+        body: 2 as const,
+      },
+    });
+
+    const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
+    expect(body.requestId).toMatch(UUID_V4_PATTERN);
   });
 });
