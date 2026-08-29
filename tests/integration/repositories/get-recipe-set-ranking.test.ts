@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { makeDomainFixtures } from "@/tests/fixtures/domain";
 import { createTestDatabase } from "@/tests/helpers/test-database";
+import { parseRecipeId } from "@/src/domain/id";
 import { DrizzleRecipeRepository } from "@/src/infrastructure/repositories/drizzle-recipe-repository";
 import { DrizzleSessionRepository } from "@/src/infrastructure/repositories/drizzle-session-repository";
 import { getRecipeSet } from "@/src/application/get-recipe-set";
@@ -32,17 +33,20 @@ describe("getRecipeSet full recommendation ranking", () => {
       throw new Error("TEST_FIXTURE_INVALID");
     }
     // fixtures 默认三卡完全同质，会触发 DUPLICATE_CANDIDATE；此处构造可区分的候选。
-    const recipeA = { ...baseA };
+    // fixture id 为 plain string，经既有 domain validation 恢复 RecipeId branded type。
+    const recipeA = { ...baseA, id: parseRecipeId(baseA.id) };
     const recipeB = {
       ...baseB,
-      materials: [{ name: "白酒", amountMl: 45, unit: "ml" }],
+      id: parseRecipeId(baseB.id),
+      materials: [{ name: "白酒", amountMl: 45, unit: "ml" as const }],
       steps: [{ order: 1, instruction: "先降温再分次加入白酒", isPhotoCheckpoint: false }],
     };
     const recipeC = {
       ...baseC,
+      id: parseRecipeId(baseC.id),
       materials: [
-        { name: "白酒", amountMl: 30, unit: "ml" },
-        { name: "柠檬", amountMl: 15, unit: "ml" },
+        { name: "白酒", amountMl: 30, unit: "ml" as const },
+        { name: "柠檬", amountMl: 15, unit: "ml" as const },
       ],
       missingIngredients: ["柠檬"],
       steps: [{ order: 1, instruction: "加入柠檬片并轻轻搅拌", isPhotoCheckpoint: false }],

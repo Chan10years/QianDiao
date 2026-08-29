@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { SessionIdSchema } from "@/src/domain/id";
+import { parseRecipeId, SessionIdSchema } from "@/src/domain/id";
 import { RecipeCandidateSchema, RecipeDisplaySchema } from "@/src/domain/recipe";
 import { rankRecommendation } from "@/src/agent/rank-recommendation";
 import { CandidateSetValidationError } from "@/src/agent/validate-candidate-set";
@@ -244,7 +244,8 @@ export function getRecipeSet(dependencies: GetRecipeSetDependencies, input: GetR
         },
       candidateSet: {
         recipes,
-        recommendedRecipeId: recipeSet.recommendedRecipeId,
+        // Repository 记录里只存 string；经既有 domain validation 安全恢复 RecipeId branded type。
+        recommendedRecipeId: parseRecipeId(recipeSet.recommendedRecipeId),
       },
       allowedMaterialNames: confirmedIngredients.map((ingredient) => ingredient.canonicalName),
     }).rankedRecipeIds;
