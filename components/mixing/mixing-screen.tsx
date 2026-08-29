@@ -120,18 +120,7 @@ export function MixingScreen({
       </ol>
 
       <div className="mixing-screen__measure">
-        <p className="mobile-eyebrow">当前这一步 · 用量参考</p>
         <h2>{step.instruction}</h2>
-        <ul>
-          {recipe.materials.map((material) => (
-            <li key={`${material.name}-${material.amountMl}`}>
-              {material.name} · {material.amountMl} {material.unit}
-            </li>
-          ))}
-        </ul>
-        <p className="mixing-screen__note">
-          按步骤逐步加入材料，完成当前操作后再进入下一步。普通步骤不要求拍照。
-        </p>
       </div>
 
       <FixedActionBar>

@@ -94,14 +94,14 @@ function createClient(fixture: MixingFixture, advanceMixing: SessionClientLike["
 describe("mixing screen", () => {
   afterEach(() => cleanup());
 
-  it("renders the vertical stepper with completed/current/pending states and no checkpoint photo UI", async () => {
+  it("renders the vertical stepper without repeating whole-cup measurements for the current step", async () => {
     const fixture = createMixingFixture(1);
     const client = createClient(fixture, vi.fn());
 
     render(<SessionShell sessionId={sessionId} client={client} />);
 
     expect(
-      await screen.findByRole("heading", { name: "第 2 步：再分次加入白酒并轻轻搅拌。" }),
+      await screen.findByRole("heading", { name: "再分次加入白酒并轻轻搅拌。" }),
     ).toBeInTheDocument();
     expect(client.getRecipeSet).toHaveBeenCalledWith(sessionId);
     expect(screen.getByRole("main", { name: "调饮实验" })).toHaveAttribute(
@@ -119,7 +119,8 @@ describe("mixing screen", () => {
     expect(steps[1]).toHaveAttribute("aria-current", "step");
     expect(steps[2]).toHaveAttribute("data-step-state", "pending");
 
-    expect(screen.getByText("白酒 · 30 ml")).toBeInTheDocument();
+    expect(screen.queryByText("当前这一步 · 用量参考")).not.toBeInTheDocument();
+    expect(screen.queryByText("白酒 · 30 ml")).not.toBeInTheDocument();
     expect(screen.getByText(/共 3 步/)).toBeInTheDocument();
 
     // 步骤 2 是 photo checkpoint，但新版 UI 不渲染任何拍照入口。
@@ -148,9 +149,7 @@ describe("mixing screen", () => {
 
     render(<SessionShell sessionId={sessionId} client={client} />);
 
-    expect(
-      await screen.findByRole("heading", { name: "第 1 步：先加入冰块并降温。" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "先加入冰块并降温。" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "返回上一步" })).toBeDisabled();
 
     const nextButton = screen.getByRole("button", { name: "下一步" });
@@ -172,7 +171,7 @@ describe("mixing screen", () => {
     });
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "第 2 步：再分次加入白酒并轻轻搅拌。" }),
+        screen.getByRole("heading", { name: "再分次加入白酒并轻轻搅拌。" }),
       ).toBeInTheDocument();
     });
     const steps = within(screen.getByRole("list", { name: "调饮步骤索引" })).getAllByRole(
@@ -195,9 +194,7 @@ describe("mixing screen", () => {
 
     render(<SessionShell sessionId={sessionId} client={client} />);
 
-    expect(
-      await screen.findByRole("heading", { name: "第 3 步：最后用柠檬片点缀。" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "最后用柠檬片点缀。" })).toBeInTheDocument();
     expect(client.advanceMixing).not.toHaveBeenCalled();
     const steps = within(screen.getByRole("list", { name: "调饮步骤索引" })).getAllByRole(
       "listitem",
@@ -244,9 +241,7 @@ describe("mixing screen", () => {
 
     render(<SessionShell sessionId={sessionId} client={client} />);
 
-    expect(
-      await screen.findByRole("heading", { name: "第 3 步：最后用柠檬片点缀。" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "最后用柠檬片点缀。" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "完成最后一步" }));
     expect(advanceMixing).toHaveBeenCalledWith({
       sessionId,
@@ -262,7 +257,7 @@ describe("mixing screen", () => {
     });
     await waitFor(() => {
       // 最后一步进入 FEEDBACK 后，shell 必须补拉 adjustmentState 才能渲染反馈首屏。
-      expect(screen.getByRole("heading", { name: "满意吗？" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "这一杯，满意吗？" })).toBeInTheDocument();
     });
     expect(client.getAdjustmentState).toHaveBeenCalledWith(sessionId);
     expect(screen.queryByRole("button", { name: "完成最后一步" })).not.toBeInTheDocument();
@@ -280,18 +275,14 @@ describe("mixing screen", () => {
 
     render(<SessionShell sessionId={sessionId} client={client} />);
 
-    expect(
-      await screen.findByRole("heading", { name: "第 1 步：先加入冰块并降温。" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "先加入冰块并降温。" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "下一步" }));
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
     expect(advanceMixing).toHaveBeenCalledTimes(1);
-    expect(
-      screen.getByRole("heading", { name: "第 1 步：先加入冰块并降温。" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "先加入冰块并降温。" })).toBeInTheDocument();
     // 409 后 shell 重新拉取服务端快照，仍停留在服务端记录的第 1 步。
     expect(client.getSession).toHaveBeenCalledTimes(2);
   });
