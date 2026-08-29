@@ -264,7 +264,7 @@ function assertReadyInput(
     hasOverviewImage: true,
     allIngredientsConfirmed: true,
     alcoholAbvConfirmed: true,
-    hasRecipeSet: false,
+    hasRecipeSet: session.state === "RECIPE_SELECTION",
     hasSelectedRecipe: false,
     hasSelectedAdjustedRecipe: false,
     currentStep: session.currentStep,

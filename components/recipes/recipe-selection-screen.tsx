@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { RecipeCard } from "@/components/recipes/recipe-card";
@@ -23,6 +23,7 @@ interface RecipeSelectionScreenProps {
   };
   client: SessionClientLike;
   onSelected: (result: SelectRecipeResult) => void;
+  onRegenerated: (result: Awaited<ReturnType<SessionClientLike["getRecipeSet"]>>) => void;
 }
 
 interface DragState {
@@ -37,12 +38,14 @@ export function RecipeSelectionScreen({
   recipeSet,
   client,
   onSelected,
+  onRegenerated,
 }: RecipeSelectionScreenProps) {
   const [cursor, setCursor] = useState(0);
   const [warningAcknowledgements, setWarningAcknowledgements] = useState<Set<string>>(
     () => new Set(),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dragDx, setDragDx] = useState(0);
   const [prefersReducedMotion] = useState(
@@ -65,6 +68,10 @@ export function RecipeSelectionScreen({
   );
 
   const currentRecipe = deck[cursor];
+  useEffect(() => {
+    setCursor(0);
+    setWarningAcknowledgements(new Set());
+  }, [recipeSet.id]);
   const exhausted = currentRecipe === undefined;
   const currentWarnAcknowledged =
     currentRecipe !== undefined &&
@@ -103,6 +110,21 @@ export function RecipeSelectionScreen({
       setErrorMessage(error instanceof SessionClientError ? error.message : "选择失败，请重试");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleRegenerate() {
+    if (!exhausted || isRegenerating || isSubmitting) return;
+
+    setIsRegenerating(true);
+    setErrorMessage(null);
+    try {
+      await client.generateRecipeSet({ sessionId, expectedVersion });
+      onRegenerated(await client.getRecipeSet(sessionId));
+    } catch (error) {
+      setErrorMessage(error instanceof SessionClientError ? error.message : "换批失败，请重试");
+    } finally {
+      setIsRegenerating(false);
     }
   }
 
@@ -183,7 +205,7 @@ export function RecipeSelectionScreen({
         >
           <p className="text-lg font-semibold text-stone-900">本批方案已全部看完</p>
           <p className="text-sm leading-6 text-stone-600">
-            换一批功能即将开放，届时可重新生成三套方案。
+            当前三套方案都已跳过，可以生成一批新的三套方案。
           </p>
         </section>
       ) : (
@@ -225,9 +247,10 @@ export function RecipeSelectionScreen({
           <button
             type="button"
             className="min-h-11 w-full rounded-2xl bg-stone-900 px-5 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
-            disabled
+            disabled={isRegenerating}
+            onClick={() => void handleRegenerate()}
           >
-            换一批
+            {isRegenerating ? "正在换一批…" : "换一批"}
           </button>
         ) : (
           <div className="flex gap-3">

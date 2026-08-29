@@ -186,11 +186,11 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 完成 `generateRecipeSet`、Recipe Repository、route、幂等和 state guard 调查，写出当前不可直接复用点。
-- [ ] 记录方案 A/B 的选择、替代方案和后果；取得用户最终决定。
-- [ ] 先写 RED：三张全拒绝后点击触发、重复请求、版本冲突、Safety-invalid 候选和 Provider 失败。
-- [ ] 运行定向测试确认失败原因对应 regenerate。
-- [ ] 实现最小选定 API，保证外部 Provider 调用不持有长数据库事务。
+- [x] 完成 `generateRecipeSet`、Recipe Repository、route、幂等和 state guard 调查，写出当前不可直接复用点。
+- [x] 记录方案 A/B 的选择、替代方案和后果；取得用户最终决定。
+- [x] 先写 RED：三张全拒绝后点击触发、重复请求、版本冲突、Safety-invalid 候选和 Provider 失败。
+- [x] 运行定向测试确认失败原因对应 regenerate。
+- [x] 实现最小选定 API，保证外部 Provider 调用不持有长数据库事务。
 - [ ] 运行应用/API/组件测试和全量门禁，提交并独立 Review。
 
 **Acceptance:** 三张全拒绝不会自动生成；主动点击才产生一次新的 3-card batch；新批次完成 Zod/Safety/ranking；成功后仍在 RECIPE_SELECTION，直到右滑；失败可重试且不丢当前会话；无新状态、无 migration。
@@ -477,3 +477,9 @@ YYYY-MM-DD | 决策标题
   - 选择：Task 3 先比较扩展既有 POST 与新增 regenerate Route/use case；在用户决定前不实现任一方案。
   - 替代方案：Codex 直接选择一个 API 方案；不采用。
   - 后果：Task 3 是实现前的明确决策门，不能以 UI 细节绕过后端语义。
+
+- 2026-08-29 | 方案 A：复用既有 recipes POST 进行换批
+  - 背景：Task 3 需要在 RECIPE_SELECTION 中主动换一批，同时保留 READY 首次生成合同。
+  - 选择：继续使用 `POST /api/sessions/{sessionId}/recipes`；按 session state 区分首次生成与 regenerate，成功写入新的三卡 set，GET/Repository 读取最新 active batch。
+  - 替代方案：新增 `/recipes/regenerate` route/use case；本轮不采用以避免复制既有 Provider、安全、租约和幂等管线。
+  - 后果：旧 batch 保留在数据库；新 batch 事务提交前旧 batch 可恢复，失败不改变会话状态。

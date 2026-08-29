@@ -283,11 +283,22 @@ describe("recipe selection swipe deck", () => {
     });
   });
 
-  it("shows the batch refresh entry after all three cards are rejected without regenerating", async () => {
+  it("regenerates only after the user clicks refresh after rejecting all cards", async () => {
     const user = userEvent.setup();
+    const regeneratedResponse = {
+      recipeSet: { ...recipeSet, id: "623e4567-e89b-12d3-a456-426614174000" },
+      session: { id: sessionId, state: "RECIPE_SELECTION" as const, version: 4 },
+    };
     const client = createClient({
       getSession: vi.fn().mockResolvedValue(recipeSelectionSnapshot),
-      getRecipeSet: vi.fn().mockResolvedValue(recipeSetResponse),
+      getRecipeSet: vi
+        .fn()
+        .mockResolvedValueOnce(recipeSetResponse)
+        .mockResolvedValueOnce(regeneratedResponse),
+      generateRecipeSet: vi.fn().mockResolvedValue({
+        recipeSet: regeneratedResponse.recipeSet,
+        session: { id: sessionId, state: "RECIPE_SELECTION", version: 4 },
+      }),
     });
 
     render(<SessionShell sessionId={sessionId} client={client} />);
@@ -298,9 +309,17 @@ describe("recipe selection swipe deck", () => {
     await user.click(screen.getByRole("button", { name: "不要这杯" }));
 
     expect(screen.queryByRole("heading", { name: "A 保守方案" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "换一批" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "换一批" })).toBeEnabled();
     expect(client.selectRecipe).not.toHaveBeenCalled();
     expect(client.generateRecipeSet).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "换一批" }));
+    expect(client.generateRecipeSet).toHaveBeenCalledTimes(1);
+    expect(client.generateRecipeSet).toHaveBeenCalledWith({
+      sessionId,
+      expectedVersion: 3,
+    });
+    expect(await screen.findByRole("heading", { name: "B 创意方案" })).toBeInTheDocument();
   });
 
   it("keeps the swipe deck clickable equivalents alongside the gesture", async () => {

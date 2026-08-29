@@ -341,8 +341,8 @@ export class DrizzleRecipeRepository implements RecipeRepository {
   }
 
   findSetBySession(sessionId: string): RecipeSetRecord | null {
-    const initialSet = this.findInitialRecipeSetRows(sessionId)[0];
-    return initialSet === undefined ? null : toRecipeSetRecord(initialSet.recipeSet);
+    const activeSet = this.findInitialRecipeSetRows(sessionId).at(-1);
+    return activeSet === undefined ? null : toRecipeSetRecord(activeSet.recipeSet);
   }
 
   listBySession(sessionId: string): RecipeRecord[] {

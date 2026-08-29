@@ -127,9 +127,7 @@ export function getRecipeSet(dependencies: GetRecipeSetDependencies, input: GetR
 
   let recipes;
   try {
-    const initialRecipes =
-      repository.findInitialRecipeSetBySession?.(parsed.sessionId) ??
-      repository.listBySet(recipeSet.id);
+    const initialRecipes = repository.listBySet(recipeSet.id);
     if (
       initialRecipes.length === 0 ||
       initialRecipes.some((recipe) => recipe.recipeSetId !== recipeSet.id)
