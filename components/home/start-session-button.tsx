@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { z } from "zod";
 
 import { SuccessEnvelopeSchema } from "@/src/domain/api";
@@ -33,13 +33,16 @@ export function StartSessionButton({ fetcher }: StartSessionButtonProps) {
   const router = useRouter();
   const [isStarting, setIsStarting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // 一次"尚未确认成功的开始调饮意图"保留同一个 requestId：
+  // 网络/服务器失败后重试继续复用，成功跳转后生命周期结束。
+  const pendingRequestIdRef = useRef<string | null>(null);
 
-  async function createSession(): Promise<string> {
+  async function createSession(requestId: string): Promise<string> {
     const request = fetcher ?? globalThis.fetch.bind(globalThis);
     const response = await request("/api/sessions", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ requestId: createRequestId() }),
+      body: JSON.stringify({ requestId }),
       cache: "no-store",
     });
 
@@ -72,8 +75,11 @@ export function StartSessionButton({ fetcher }: StartSessionButtonProps) {
     setIsStarting(true);
     setErrorMessage(null);
     try {
-      const sessionId = await createSession();
-      // 保持按钮禁用直到跳转完成，避免重复点击连续创建会话。
+      const requestId = pendingRequestIdRef.current ?? createRequestId();
+      pendingRequestIdRef.current = requestId;
+      const sessionId = await createSession(requestId);
+      // 成功拿到 Session，requestId 生命周期结束；保持按钮禁用直到跳转完成。
+      pendingRequestIdRef.current = null;
       router.push(`/session/${sessionId}`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : DEFAULT_ERROR_MESSAGE);
