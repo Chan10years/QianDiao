@@ -1,0 +1,46 @@
+Task.md
+  s_25c97154d46b2b::t_2a64a2bb17053e 145,147-149
+  s_25c97154d46b2b::t_cf32ebc6f51195 433-436
+components/recipes/recipe-selection-screen.tsx
+  s_25c97154d46b2b::t_a8724e7196970c 200-203
+  s_25c97154d46b2b::t_bd4bb79cda0c0e 3-4,15,28-33,41,47-48,50-52,54-63,69-92,100-101,111-148,155,181-199,204-223,226-253
+components/recipes/recipe-card.tsx
+  s_25c97154d46b2b::t_6b4fcb7fb2c607 27
+tests/components/recipes/recipe-selection-screen.test.tsx
+  s_25c97154d46b2b::t_ff3cd18f131317 99-102,107-108
+  s_25c97154d46b2b::t_96bb1603a42df0 24-35,38,40,42-98
+  s_25c97154d46b2b::t_fe6b2f5dd63cea 239
+  s_25c97154d46b2b::t_4c0e123b6223e3 315-337,340-343
+  s_25c97154d46b2b::t_7653d1abc42a43 209,241,283,302
+  s_25c97154d46b2b::t_940c7377084bee 3,23,111-147,150,152-153,155,164-170,173-181,184-185,187-188,192,194-202,205,207-208,212,214,218,223-225,229,233,236-238,240,242-282,284-301,303-314,339,344-362
+  s_25c97154d46b2b::t_783c80acf81f79 338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "5ed31d764f071f0976a086636bc68041dcadfdf0",
+  "prompts": {},
+  "sessions": {
+    "s_25c97154d46b2b": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a927f32f68793fce05b4965",
+        "model": "glm-5.3-flash__dev"
+      },
+      "human_author": "Chan <Lacoschen77@163.com>",
+      "custom_attributes": {
+        "edit_kind": "file_edit",
+        "client_type": "ide",
+        "runtime_client": "trae-tob-git-ai",
+        "source_scene": "unknown",
+        "operation_id": "6a928407f68793fce05b4a09",
+        "tool_type": "agent",
+        "tool_use_id": "6a928407f68793fce05b4a09",
+        "session_id": "6a927f32f68793fce05b4965",
+        "external_session_id": "6a927f32f68793fce05b4965",
+        "dedupe_key": "6a927f32f68793fce05b4965:6a928407f68793fce05b4a09:afterEdit:8b9e5eac",
+        "tool_id": "Edit"
+      }
+    }
+  }
+}
