@@ -88,14 +88,14 @@ export function StartSessionButton({ fetcher }: StartSessionButtonProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="home-start">
       <button
         type="button"
         onClick={handleStart}
         disabled={isStarting}
-        className="w-full rounded-2xl bg-amber-600 px-6 py-4 text-base font-semibold text-white shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        className="home-start__button"
       >
-        {isStarting ? "正在创建调饮会话…" : "开始调饮"}
+        {isStarting ? "正在创建调饮会话…" : "开始我的风味实验"}
       </button>
       {errorMessage !== null ? (
         <div className="mobile-notice mobile-notice--error" role="alert">

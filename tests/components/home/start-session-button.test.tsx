@@ -40,7 +40,7 @@ describe("StartSessionButton", () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(successResponse());
     render(<StartSessionButton fetcher={fetcher} />);
 
-    await user.click(screen.getByRole("button", { name: "开始调饮" }));
+    await user.click(screen.getByRole("button", { name: "开始我的风味实验" }));
 
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith(`/session/${SESSION_ID}`);
@@ -62,7 +62,7 @@ describe("StartSessionButton", () => {
     const fetcher = vi.fn<typeof fetch>().mockReturnValue(pendingCreation);
     render(<StartSessionButton fetcher={fetcher} />);
 
-    const button = screen.getByRole("button", { name: "开始调饮" });
+    const button = screen.getByRole("button", { name: "开始我的风味实验" });
     await user.click(button);
     await user.click(button);
     await user.click(button);
@@ -96,13 +96,13 @@ describe("StartSessionButton", () => {
       .mockResolvedValueOnce(successResponse());
     render(<StartSessionButton fetcher={fetcher} />);
 
-    await user.click(screen.getByRole("button", { name: "开始调饮" }));
+    await user.click(screen.getByRole("button", { name: "开始我的风味实验" }));
 
     expect(pushMock).not.toHaveBeenCalled();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("服务器内部错误");
 
-    await user.click(screen.getByRole("button", { name: "开始调饮" }));
+    await user.click(screen.getByRole("button", { name: "开始我的风味实验" }));
 
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith(`/session/${SESSION_ID}`);
@@ -146,8 +146,8 @@ describe("StartSessionButton", () => {
     const { rerender } = render(<StartSessionButton fetcher={fetcher} />);
 
     // 第一次意图失败两次（含重试），requestId 保持一致
-    await user.click(screen.getByRole("button", { name: "开始调饮" }));
-    await user.click(screen.getByRole("button", { name: "开始调饮" }));
+    await user.click(screen.getByRole("button", { name: "开始我的风味实验" }));
+    await user.click(screen.getByRole("button", { name: "开始我的风味实验" }));
     expect(pushMock).toHaveBeenCalledWith(`/session/${SESSION_ID}`);
     const firstIntentBody = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
     const firstRetryBody = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
@@ -156,7 +156,7 @@ describe("StartSessionButton", () => {
     // 模拟用户跳转后返回首页，重新挂载组件 = 全新的开始调饮意图
     pushMock.mockClear();
     rerender(<StartSessionButton key="second-intent" fetcher={fetcher} />);
-    await user.click(screen.getByRole("button", { name: "开始调饮" }));
+    await user.click(screen.getByRole("button", { name: "开始我的风味实验" }));
 
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/session/223e4567-e89b-42d3-a456-426614174001");
