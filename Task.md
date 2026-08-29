@@ -434,6 +434,11 @@ YYYY-MM-DD | Task N | commit <sha>
   - 验证：ranking 稳定性调查结论 STABLE——`rank-recipe-candidates` 输出的推荐第一名以 `recommendedRecipeId` 持久化，Repository 写入/读取保持 recipes 顺序，GET 返回原数组顺序；前端仅按 `recommendedRecipeId` 提位，不重新 sort。定向测试：`recipe-selection-screen.test.tsx` 7 passed（RED 曾 7 failed）、`tests/components/session` 7 passed、`pnpm typecheck` 通过。Hackathon Sprint Mode 下未运行全量 `pnpm test / lint / format:check / build / test:e2e`。
   - 结果：实现单卡 Swipe Deck——首屏显示 recommendation ranking #1，左滑/“不要这杯”仅推进本地 deck cursor（零 client 调用），右滑/“选这杯”调用现有 `selectRecipe`（复用 requestId/expectedVersion/409 recovery），WARN 未确认禁用选择，BLOCK 卡只展示审计摘要不入 deck，三张全拒绝显示禁用“换一批”入口（Task 2 不实现 regenerate）；移除 RecipeCard 旧 radio 选择，保留点击等价操作与 reduced-motion。
   - 风险：独立 Reviewer 尚未审查；全量门禁待统一执行；“换一批”按钮当前为禁用占位，真实 regenerate 属 Task 3；`session-shell.tsx` 无需修改。
+- 2026-08-29 | Task 2 | Reviewer Important finding 修复：GET 时 deterministic re-ranking（Reviewer re-review pending，branch `task-2-recipe-swipe-deck`）
+  - Reviewer finding：此前记录的 "ranking STABLE" 结论有误——完整 ranking 在生成时计算但只持久化 `recommendedRecipeId`，Repository GET 恢复 A/B/C 落库顺序，前端按 `recommendedRecipeId` 提位会把正确 `[B,C,A]` 退化成 `[B,A,C]`。
+  - 修复方案（用户已定，方案 B）：`get-recipe-set` 在读取时复用同一个 `rankRecommendation` deterministic 逻辑重算完整 ranking（输入 session.preferences、recipes、confirmed ingredients 均来自既有持久化数据），GET 直接返回完整 ranked 顺序；不改 DB schema、不加 migration、不加 `rankingPosition` 字段、不产生任何 Provider/LLM 调用。`recommendedRecipeId` 保留用于推荐标识与兼容现有合同；前端删除补偿性提位逻辑，直接消费服务端顺序。
+  - 验证：新增全链路回归 `tests/integration/repositories/get-recipe-set-ranking.test.ts`（证明偏好产生 `[B,C,A]`、Repository 实际读取仍为 A/B/C、GET 重算后返回 `[B,C,A]`）；组件测试 fixture 改为真实服务端顺序 `[B,C,A]`，断言首张 B → 左滑 C → 再左滑 A；保留单卡、左滑零 client mutation、当前卡 accept、WARN confirmation、reject-all 不 regenerate 回归。定向测试：`get-recipe-set-ranking.test.ts` + `recipe-selection-screen.test.tsx` 8 passed、`rank-recommendation.test.ts` + `generate-recipe-set.test.ts` 34 passed。Hackathon Sprint Mode 下未运行全量门禁。
+  - 风险：Reviewer re-review pending；全量门禁待统一执行；“换一批”仍为禁用占位（Task 3）。
 
 ## Decision log
 

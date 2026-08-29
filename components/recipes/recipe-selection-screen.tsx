@@ -53,14 +53,12 @@ export function RecipeSelectionScreen({
   );
   const dragState = useRef<DragState | null>(null);
 
-  // 首张必须是 recommendation ranking #1（recommendedRecipeId）；
-  // 其余卡片保持服务端返回顺序，前端不得按 A/B/C、ID、时间等重新排序。
-  const deck = useMemo(() => {
-    const selectable = recipeSet.recipes.filter((recipe) => recipe.safety.level !== "BLOCK");
-    const recommended = selectable.find((recipe) => recipe.id === recipeSet.recommendedRecipeId);
-    if (recommended === undefined) return selectable;
-    return [recommended, ...selectable.filter((recipe) => recipe.id !== recommended.id)];
-  }, [recipeSet]);
+  // 服务端 GET 已通过 deterministic re-ranking 返回完整 recommendation ranking 顺序；
+  // 前端直接消费该顺序，只过滤 BLOCK 卡，不得按 recommendedRecipeId 或 A/B/C 重排。
+  const deck = useMemo(
+    () => recipeSet.recipes.filter((recipe) => recipe.safety.level !== "BLOCK"),
+    [recipeSet],
+  );
   const blockedRecipes = useMemo(
     () => recipeSet.recipes.filter((recipe) => recipe.safety.level === "BLOCK"),
     [recipeSet.recipes],

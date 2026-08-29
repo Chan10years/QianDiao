@@ -111,5 +111,6 @@ export function rankRecommendation(input: {
   return {
     candidateSet: rankedCandidateSet,
     scores,
+    rankedRecipeIds: sortedScores.map((score) => score.recipeId),
   };
 }
