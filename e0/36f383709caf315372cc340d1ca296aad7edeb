@@ -1,0 +1,49 @@
+next.config.ts
+  s_c8b29481d4ef0d::t_82380883a090db 3-11
+  s_c8b29481d4ef0d::t_5a3d806c7c01d6 12
+components/home/start-session-button.tsx
+  s_c8b29481d4ef0d::t_f1d453b6ad7714 1-102
+app/page.tsx
+  s_c8b29481d4ef0d::t_d281932b9c006f 1-2,11,14
+tests/components/home/start-session-button.test.tsx
+  s_c8b29481d4ef0d::t_ae37a9ca0189e5 1-2
+  s_c8b29481d4ef0d::t_af39b8c38ecae9 3-33,35-117
+  s_c8b29481d4ef0d::t_7a642d035e8830 34
+src/infrastructure/http/session-client.ts
+  s_c8b29481d4ef0d::t_be9a76f1c007a5 360
+  s_c8b29481d4ef0d::t_b252946bd84dbe 361-363
+tests/components/preferences/session-client.test.ts
+  s_c8b29481d4ef0d::t_0746be582d4273 3-5
+  s_c8b29481d4ef0d::t_13249f2f837c82 571-615
+.env.example
+  s_c8b29481d4ef0d::t_4c69261c585b7e 3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "e036f383709caf315372cc340d1ca296aad7edeb",
+  "prompts": {},
+  "sessions": {
+    "s_c8b29481d4ef0d": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a927329f68793fce05b487f",
+        "model": "glm-5.3-flash__dev"
+      },
+      "human_author": "Chan <Lacoschen77@163.com>",
+      "custom_attributes": {
+        "tool_type": "agent",
+        "tool_use_id": "6a927480f68793fce05b4902",
+        "dedupe_key": "6a927329f68793fce05b487f:6a927480f68793fce05b4902:afterEdit:7eaa44e9",
+        "operation_id": "6a927480f68793fce05b4902",
+        "source_scene": "unknown",
+        "client_type": "ide",
+        "tool_id": "Edit",
+        "external_session_id": "6a927329f68793fce05b487f",
+        "edit_kind": "file_edit",
+        "runtime_client": "trae-tob-git-ai",
+        "session_id": "6a927329f68793fce05b487f"
+      }
+    }
+  }
+}
