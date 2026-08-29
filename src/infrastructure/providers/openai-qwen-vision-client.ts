@@ -36,14 +36,6 @@ export class OpenAIQwenVisionClient implements QwenVisionCompletionClient {
         },
       ],
       temperature: 0,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "vision_result",
-          strict: true,
-          schema: request.jsonSchema as Record<string, unknown>,
-        },
-      },
     });
     const content = response.choices[0]?.message.content;
 

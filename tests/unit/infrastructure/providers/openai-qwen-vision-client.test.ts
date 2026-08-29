@@ -11,7 +11,7 @@ vi.mock("openai", () => ({
 import { OpenAIQwenVisionClient } from "@/src/infrastructure/providers/openai-qwen-vision-client";
 
 describe("OpenAIQwenVisionClient", () => {
-  it("sends image data URLs as multimodal image content", async () => {
+  it("sends the multimodal request without structured output configuration", async () => {
     openAIComplete.mockResolvedValue({
       choices: [{ message: { content: '{"ingredients":[]}' } }],
     });
@@ -34,23 +34,24 @@ describe("OpenAIQwenVisionClient", () => {
       ],
     });
 
-    const request = openAIComplete.mock.calls[0]?.[0] as {
-      messages: Array<{
-        content: Array<
-          | { type: "text"; text: string }
-          | { type: "image_url"; image_url: { url: string; detail: string } }
-        >;
-      }>;
-    };
-    expect(request.messages[0]?.content).toEqual([
-      { type: "text", text: "识别图片中的材料" },
-      {
-        type: "image_url",
-        image_url: {
-          url: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD",
-          detail: "high",
+    expect(openAIComplete).toHaveBeenCalledWith({
+      model: "qwen-vision-test",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "识别图片中的材料" },
+            {
+              type: "image_url",
+              image_url: {
+                url: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD",
+                detail: "high",
+              },
+            },
+          ],
         },
-      },
-    ]);
+      ],
+      temperature: 0,
+    });
   });
 });

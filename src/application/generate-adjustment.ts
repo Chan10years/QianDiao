@@ -50,7 +50,7 @@ import { RecipeDataIntegrityError } from "@/src/repositories/recipe-repository";
 import { IdempotencyLeaseLostError } from "@/src/repositories/idempotency-reservation-repository";
 
 const PENDING_IDEMPOTENCY_STATUS_CODE = 102;
-const DEFAULT_LEASE_DURATION_MS = 15_000;
+const DEFAULT_LEASE_DURATION_MS = 150_000;
 
 const GenerateAdjustmentInputSchema = MutationMetaSchema.extend({
   sessionId: SessionIdSchema,
