@@ -1,0 +1,50 @@
+src/agent/rank-recommendation.ts
+  s_25c97154d46b2b::t_4ada43549295a7 114
+tests/integration/repositories/get-recipe-set-ranking.test.ts
+  s_25c97154d46b2b::t_4d1951f9c46c64 30-31,34-49
+  s_25c97154d46b2b::t_eb85f3d29e98bb 1-29,32-33,50-53,58-174
+  s_25c97154d46b2b::t_ec3060dea93de3 54-57
+Task.md
+  s_25c97154d46b2b::t_889cc93ccdc976 437-441
+tests/components/recipes/recipe-selection-screen.test.tsx
+  s_25c97154d46b2b::t_e22ef30edbb216 62-77
+  s_25c97154d46b2b::t_a65722dc0081d0 245
+  s_25c97154d46b2b::t_29a4e655af73b7 213
+  s_25c97154d46b2b::t_b3a56e5dbf4f67 333,348,352-353,358
+  s_25c97154d46b2b::t_5533377a96aba8 78-79
+components/recipes/recipe-selection-screen.tsx
+  s_25c97154d46b2b::t_5e24ae5a50c92b 56-61
+src/application/get-recipe-set.ts
+  s_25c97154d46b2b::t_121f41a840e08f 5-6
+  s_25c97154d46b2b::t_3e5f71fba7e366 233-273
+  s_25c97154d46b2b::t_77be7c58177702 322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "43e86321a477767383f73fcbd48f567e8b05bb50",
+  "prompts": {},
+  "sessions": {
+    "s_25c97154d46b2b": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a927f32f68793fce05b4965",
+        "model": "glm-5.3-flash__dev"
+      },
+      "human_author": "Chan <Lacoschen77@163.com>",
+      "custom_attributes": {
+        "operation_id": "6a928e18f68793fce05b4af2",
+        "external_session_id": "6a927f32f68793fce05b4965",
+        "tool_use_id": "6a928e18f68793fce05b4af2",
+        "tool_type": "agent",
+        "source_scene": "unknown",
+        "client_type": "ide",
+        "tool_id": "Edit",
+        "runtime_client": "trae-tob-git-ai",
+        "edit_kind": "file_edit",
+        "session_id": "6a927f32f68793fce05b4965",
+        "dedupe_key": "6a927f32f68793fce05b4965:6a928e18f68793fce05b4af2:afterEdit:8b9e5eac"
+      }
+    }
+  }
+}
