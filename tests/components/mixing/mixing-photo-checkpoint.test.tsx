@@ -5,10 +5,13 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { MixingPhotoCheckpointPanel } from "@/components/mixing/mixing-photo-checkpoint-panel";
 import { MixingScreen } from "@/components/mixing/mixing-screen";
 import { RecipeDisplaySchema } from "@/src/domain/recipe";
 import type { SessionClientLike } from "@/src/infrastructure/http/session-client";
 import { makeDomainFixtures } from "@/tests/fixtures/domain";
+
+const sessionId = "11111111-1111-4111-8111-111111111111";
 
 function makeClient(): SessionClientLike {
   return {
@@ -34,7 +37,8 @@ function makeRecipe(isPhotoCheckpoint: boolean) {
   });
 }
 
-describe("mixing photo checkpoint", () => {
+// 面板已从渲染路径退役：仅 legacy 面板自身保留旧交互。
+describe("legacy mixing photo checkpoint panel", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
@@ -42,13 +46,12 @@ describe("mixing photo checkpoint", () => {
 
   it("opens the photo-first panel with the camera input contract", () => {
     render(
-      <MixingScreen
-        sessionId="11111111-1111-4111-8111-111111111111"
+      <MixingPhotoCheckpointPanel
+        sessionId={sessionId}
         expectedVersion={1}
         currentStep={0}
-        recipe={makeRecipe(true)}
+        recipeId="recipe-1"
         client={makeClient()}
-        onAdvanced={vi.fn()}
       />,
     );
 
@@ -62,41 +65,23 @@ describe("mixing photo checkpoint", () => {
     expect(screen.getByLabelText("拍摄关键步骤照片")).toHaveAttribute("capture", "environment");
   });
 
-  it("does not show photo UI for a normal step", () => {
-    render(
-      <MixingScreen
-        sessionId="11111111-1111-4111-8111-111111111111"
-        expectedVersion={1}
-        currentStep={0}
-        recipe={makeRecipe(false)}
-        client={makeClient()}
-        onAdvanced={vi.fn()}
-      />,
-    );
-
-    expect(screen.queryByRole("heading", { name: "拍照专页" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "拍摄关键步骤" })).not.toBeInTheDocument();
-  });
-
-  it("skips the panel without upload or advance and then allows the normal step action", async () => {
+  it("skips the panel without any upload", async () => {
     const client = makeClient();
     const user = userEvent.setup();
     render(
-      <MixingScreen
-        sessionId="11111111-1111-4111-8111-111111111111"
+      <MixingPhotoCheckpointPanel
+        sessionId={sessionId}
         expectedVersion={1}
         currentStep={0}
-        recipe={makeRecipe(true)}
+        recipeId="recipe-1"
         client={client}
-        onAdvanced={vi.fn()}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "暂时跳过" }));
     expect(screen.queryByRole("heading", { name: "拍照专页" })).not.toBeInTheDocument();
+    expect(client.uploadMixingStepImage).not.toHaveBeenCalled();
     expect(client.uploadOverviewImage).not.toHaveBeenCalled();
-    expect(client.advanceMixing).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "完成最后一步" })).toBeEnabled();
   });
 
   it("keeps the local preview after an upload error and retries the same file", async () => {
@@ -116,7 +101,7 @@ describe("mixing photo checkpoint", () => {
           height: 6,
         },
         session: {
-          id: "11111111-1111-4111-8111-111111111111",
+          id: sessionId,
           state: "MIXING",
           version: 2,
         },
@@ -124,14 +109,12 @@ describe("mixing photo checkpoint", () => {
     client.uploadMixingStepImage = uploadMixingStepImage;
 
     render(
-      <MixingScreen
-        sessionId="11111111-1111-4111-8111-111111111111"
+      <MixingPhotoCheckpointPanel
+        sessionId={sessionId}
         expectedVersion={1}
         currentStep={0}
-        recipe={makeRecipe(true)}
+        recipeId="recipe-1"
         client={client}
-        onAdvanced={vi.fn()}
-        onPhotoUploaded={vi.fn()}
       />,
     );
 
@@ -140,6 +123,9 @@ describe("mixing photo checkpoint", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("照片上传失败"));
     expect(screen.getByAltText("关键步骤照片本地预览")).toHaveAttribute("src", "blob:checkpoint");
     expect(uploadMixingStepImage).toHaveBeenCalledTimes(1);
+    expect(uploadMixingStepImage).toHaveBeenCalledWith(
+      expect.objectContaining({ recipeId: "recipe-1", stepIndex: 0 }),
+    );
     expect(revokeObjectUrl).not.toHaveBeenCalledWith("blob:checkpoint");
 
     await user.click(screen.getByRole("button", { name: "重试上传" }));
@@ -151,31 +137,29 @@ describe("mixing photo checkpoint", () => {
 
   it("restores a persisted photo and exposes replacement without reopening the initial prompt", async () => {
     const user = userEvent.setup();
-    const recipe = makeRecipe(true);
     render(
-      <MixingScreen
-        sessionId="11111111-1111-4111-8111-111111111111"
+      <MixingPhotoCheckpointPanel
+        sessionId={sessionId}
         expectedVersion={2}
         currentStep={0}
-        recipe={recipe}
+        recipeId="recipe-1"
+        client={makeClient()}
         mixingPhoto={{
           imageId: "223e4567-e89b-12d3-a456-426614174000",
           role: "mixing_step",
-          recipeId: recipe.id,
+          recipeId: "recipe-1",
           stepIndex: 0,
           mime: "image/jpeg",
           width: 8,
           height: 6,
         }}
-        client={makeClient()}
-        onAdvanced={vi.fn()}
       />,
     );
 
     expect(screen.queryByRole("heading", { name: "拍照专页" })).not.toBeInTheDocument();
     expect(screen.getByAltText("已保存的关键步骤照片")).toHaveAttribute(
       "src",
-      "/api/sessions/11111111-1111-4111-8111-111111111111/images/223e4567-e89b-12d3-a456-426614174000?v=2",
+      `/api/sessions/${sessionId}/images/223e4567-e89b-12d3-a456-426614174000?v=2`,
     );
     await user.click(screen.getByRole("button", { name: "替换照片" }));
     expect(screen.getByRole("heading", { name: "拍照专页" })).toBeInTheDocument();
@@ -185,7 +169,6 @@ describe("mixing photo checkpoint", () => {
     const user = userEvent.setup();
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:replacement");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
-    const recipe = makeRecipe(true);
     const imageId = "223e4567-e89b-12d3-a456-426614174000";
     const uploadMixingStepImage = vi.fn().mockResolvedValue({
       image: {
@@ -196,7 +179,7 @@ describe("mixing photo checkpoint", () => {
         height: 12,
       },
       session: {
-        id: "11111111-1111-4111-8111-111111111111",
+        id: sessionId,
         state: "MIXING",
         version: 3,
       },
@@ -207,22 +190,21 @@ describe("mixing photo checkpoint", () => {
     function Harness() {
       const [expectedVersion, setExpectedVersion] = useState(2);
       return (
-        <MixingScreen
-          sessionId="11111111-1111-4111-8111-111111111111"
+        <MixingPhotoCheckpointPanel
+          sessionId={sessionId}
           expectedVersion={expectedVersion}
           currentStep={0}
-          recipe={recipe}
+          recipeId="recipe-1"
+          client={client}
           mixingPhoto={{
             imageId,
             role: "mixing_step",
-            recipeId: recipe.id,
+            recipeId: "recipe-1",
             stepIndex: 0,
             mime: "image/jpeg",
             width: 8,
             height: 6,
           }}
-          client={client}
-          onAdvanced={vi.fn()}
           onPhotoUploaded={(result) => setExpectedVersion(result.session.version)}
         />
       );
@@ -231,10 +213,7 @@ describe("mixing photo checkpoint", () => {
     render(<Harness />);
 
     const persistedPhoto = screen.getByAltText("已保存的关键步骤照片");
-    expect(persistedPhoto).toHaveAttribute(
-      "src",
-      `/api/sessions/11111111-1111-4111-8111-111111111111/images/${imageId}?v=2`,
-    );
+    expect(persistedPhoto).toHaveAttribute("src", `/api/sessions/${sessionId}/images/${imageId}?v=2`);
 
     await user.click(screen.getByRole("button", { name: "替换照片" }));
     await user.upload(
@@ -245,11 +224,38 @@ describe("mixing photo checkpoint", () => {
     await waitFor(() =>
       expect(screen.getByAltText("已保存的关键步骤照片")).toHaveAttribute(
         "src",
-        `/api/sessions/11111111-1111-4111-8111-111111111111/images/${imageId}?v=3`,
+        `/api/sessions/${sessionId}/images/${imageId}?v=3`,
       ),
     );
     expect(uploadMixingStepImage).toHaveBeenCalledWith(
       expect.objectContaining({ expectedVersion: 2 }),
     );
+  });
+});
+
+// 渲染路径退役证明：新版 MixingScreen 对 photo checkpoint 步骤不再渲染任何照片入口，
+// 且步骤推进不受拍照前置条件约束。
+describe("mixing screen renders no checkpoint photo UI", () => {
+  afterEach(() => cleanup());
+
+  it("keeps photo checkpoint steps advanceable without any photo UI", () => {
+    const client = makeClient();
+    render(
+      <MixingScreen
+        sessionId={sessionId}
+        expectedVersion={1}
+        currentStep={0}
+        recipe={makeRecipe(true)}
+        client={client}
+        onAdvanced={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("heading", { name: "拍照专页" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "拍摄关键步骤" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "暂时跳过" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("拍摄关键步骤照片")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "完成最后一步" })).toBeEnabled();
+    expect(client.uploadMixingStepImage).not.toHaveBeenCalled();
   });
 });

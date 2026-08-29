@@ -295,40 +295,6 @@ export function SessionShell(_props: SessionShellProps) {
                   currentStep={snapshot.data.currentStep}
                   recipe={selectedRecipe}
                   client={conflictAwareClient}
-                  mixingPhoto={snapshot.data.mixingPhotos.find(
-                    (photo) =>
-                      photo.recipeId === selectedRecipe.id &&
-                      photo.stepIndex === snapshot.data.currentStep,
-                  )}
-                  onPhotoUploaded={(result) => {
-                    setSnapshot((current) => {
-                      if (current === null) return current;
-                      const nextPhoto = {
-                        imageId: result.image.id,
-                        role: "mixing_step" as const,
-                        recipeId: selectedRecipe.id,
-                        stepIndex: snapshot.data.currentStep ?? 0,
-                        mime: result.image.mime,
-                        width: result.image.width,
-                        height: result.image.height,
-                      };
-                      return {
-                        ...current,
-                        data: {
-                          ...current.data,
-                          mixingPhotos: [
-                            ...current.data.mixingPhotos.filter(
-                              (photo) =>
-                                photo.recipeId !== selectedRecipe.id ||
-                                photo.stepIndex !== nextPhoto.stepIndex,
-                            ),
-                            nextPhoto,
-                          ],
-                        },
-                        session: result.session,
-                      };
-                    });
-                  }}
                   onAdvanced={(result) => {
                     setSnapshot((current) =>
                       current === null
