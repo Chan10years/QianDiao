@@ -1,4 +1,4 @@
-# Guikesong YQZ Product Pivot Spec
+# QianDiao Product Pivot Spec
 
 - 状态：当前仓库产品交互与 MVP 范围的最高真相源
 - 日期：2026-08-28
@@ -7,7 +7,7 @@
 
 本文采用“继承 + 覆盖”，不复制旧架构规格。未在本文覆盖的后端、安全、Zod、Provider、数据库、幂等、并发和运行约束继续继承：
 
-- `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`
+- `docs/superpowers/specs/2026-08-21-qiandiao-architecture-design.md`
 - `docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
 
 ## 1. Goal

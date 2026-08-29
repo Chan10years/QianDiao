@@ -2,8 +2,8 @@
 
 状态：基线运行规范  
 最后更新：2026-08-28
-当前产品真相源：`docs/superpowers/specs/2026-08-28-guikesong-yqz-product-pivot.md`
-继承架构参考：`docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`、`docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
+当前产品真相源：`docs/superpowers/specs/2026-08-28-qiandiao-product-pivot.md`
+继承架构参考：`docs/superpowers/specs/2026-08-21-qiandiao-architecture-design.md`、`docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
 
 ## 1. 目的与边界
 

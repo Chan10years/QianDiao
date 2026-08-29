@@ -1,4 +1,4 @@
-# Guikesong YQZ Product Pivot Implementation Plan
+# QianDiao Product Pivot Implementation Plan
 
 > **For agentic workers:** 每个实现 Task 必须使用 `superpowers:test-driven-development`；完成前使用 `superpowers:verification-before-completion`。每个 Task 都必须经过 Codex implementation → commit → Claude Code independent Review；Review FAIL 时由 Codex 定点修复并重新审查，PASS 后才能进入下一个 Task。
 
@@ -8,11 +8,11 @@
 
 **Tech Stack:** Node.js 24 LTS、pnpm、Next.js 16 App Router、React 19、TypeScript strict、Tailwind CSS 4、Zod 4、SQLite、Drizzle ORM/Kit、better-sqlite3、sharp、Vitest 4、React Testing Library、Playwright、ESLint、Prettier。
 
-**Spec:** `docs/superpowers/specs/2026-08-28-guikesong-yqz-product-pivot.md`
+**Spec:** `docs/superpowers/specs/2026-08-28-qiandiao-product-pivot.md`
 
 **Inherited references:**
 
-- `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`
+- `docs/superpowers/specs/2026-08-21-qiandiao-architecture-design.md`
 - `docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
 
 **Frozen baseline:** 旧工程来源 `815add106fdd196c805cc2cc71941455241f0bfb`；本仓库 baseline `b27c353f71fd7f411697cd659c20face56c63bad`。
@@ -57,12 +57,12 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Files:**
 
-- Create: `docs/superpowers/specs/2026-08-28-guikesong-yqz-product-pivot.md`
+- Create: `docs/superpowers/specs/2026-08-28-qiandiao-product-pivot.md`
 - Create exact archive: `docs/baseline/Task-frozen-pre-pivot.md`
 - Modify: `AGENTS.md`
 - Modify: `PRODUCTION.md`
 - Replace: `Task.md`
-- Preserve unchanged: `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`, `docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
+- Preserve unchanged: `docs/superpowers/specs/2026-08-21-qiandiao-architecture-design.md`, `docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`
 
 **Tests:**
 

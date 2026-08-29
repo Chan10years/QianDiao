@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node.js 24 LTS、pnpm、Next.js 16 App Router、React 19、TypeScript strict、Tailwind CSS 4、Zod 4、SQLite、Drizzle ORM/Kit、better-sqlite3、sharp、Vitest 4、React Testing Library、Playwright、ESLint、Prettier。
 
-**Spec:** `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-21-qiandiao-architecture-design.md`
 
 ## Global Constraints
 
@@ -35,12 +35,12 @@
 
 ### 里程碑
 
-| 里程碑 | 任务 | 可演示结果 |
-|---|---|---|
-| M1 灰盒闭环 | 1–6 | 无 AI、无图片也能建会话、填口味、走状态、安全和数据库 |
-| M2 识别与三方案 | 7–10 | 上传/确认材料，fallback 生成三套安全方案 |
-| M3 手机完整体验 | 11–13 | 手机完成选择、调饮、反馈、持续调整或完成 |
-| M4 真实 Provider 与加固 | 14–17 | 真实模型可切换、搜索可降级、断线可恢复、三次稳定彩排 |
+| 里程碑                  | 任务  | 可演示结果                                            |
+| ----------------------- | ----- | ----------------------------------------------------- |
+| M1 灰盒闭环             | 1–6   | 无 AI、无图片也能建会话、填口味、走状态、安全和数据库 |
+| M2 识别与三方案         | 7–10  | 上传/确认材料，fallback 生成三套安全方案              |
+| M3 手机完整体验         | 11–13 | 手机完成选择、调饮、反馈、持续调整或完成              |
+| M4 真实 Provider 与加固 | 14–17 | 真实模型可切换、搜索可降级、断线可恢复、三次稳定彩排  |
 
 ---
 
@@ -48,7 +48,7 @@
 
 **Files:**
 
-- Preserve: `AGENTS.md`, `PRODUCTION.md`, `Task.md`, `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`
+- Preserve: `AGENTS.md`, `PRODUCTION.md`, `Task.md`, `docs/superpowers/specs/2026-08-21-qiandiao-architecture-design.md`
 - Create: `package.json`, `pnpm-lock.yaml`, `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `.prettierrc.json`, `.prettierignore`, `.gitignore`, `.nvmrc`, `.node-version`, `.env.example`
 - Create: `app/layout.tsx`, `app/page.tsx`, `app/globals.css`, `app/api/health/route.ts`
 - Create: `vitest.config.ts`, `vitest.setup.ts`, `playwright.config.ts`
@@ -85,6 +85,7 @@ pnpm dlx create-next-app@16 scaffold-tmp \
   --ts --tailwind --eslint --app --no-src-dir \
   --import-alias "@/*" --use-pnpm --turbopack
 ```
+
 - [x] 安装冻结依赖：`zod drizzle-orm better-sqlite3 sharp openai`；开发依赖：`drizzle-kit @types/better-sqlite3 tsx vitest @vitest/coverage-v8 jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event @playwright/test prettier prettier-plugin-tailwindcss`。
 - [x] 运行 `pnpm exec playwright install chromium` 安装 E2E 浏览器；CI/新机器也必须显式执行，不能依赖开发机缓存。
 - [x] 在 `package.json` 固定 `packageManager` 和 Node engines；在 `.nvmrc`、`.node-version` 写 `24`。
@@ -138,14 +139,28 @@ interface TasteProfile {
 }
 
 type SessionState =
-  | "PREFERENCES" | "SCAN" | "CONFIRM" | "READY"
-  | "RECIPE_SELECTION" | "MIXING" | "FEEDBACK"
-  | "ADJUSTMENT" | "COMPLETED";
+  | "PREFERENCES"
+  | "SCAN"
+  | "CONFIRM"
+  | "READY"
+  | "RECIPE_SELECTION"
+  | "MIXING"
+  | "FEEDBACK"
+  | "ADJUSTMENT"
+  | "COMPLETED";
 
 type IngredientCategory =
-  | "spirit" | "mixer" | "tea" | "fruit" | "sweetener"
-  | "herb" | "ice" | "energy_drink" | "medicine"
-  | "non_food" | "unknown";
+  | "spirit"
+  | "mixer"
+  | "tea"
+  | "fruit"
+  | "sweetener"
+  | "herb"
+  | "ice"
+  | "energy_drink"
+  | "medicine"
+  | "non_food"
+  | "unknown";
 
 type RecipeStrategy = "A_CONSERVATIVE" | "B_CREATIVE" | "C_UPGRADE";
 type SafetyLevel = "ALLOW" | "WARN" | "BLOCK";
@@ -830,12 +845,10 @@ YYYY-MM-DD | Task N | commit <sha>
   - 结果：进入 Task 1 前等待文档审阅。
   - 风险：Qwen 视觉模型具体 ID、真实手机 HEIC 支持和 Windows 防火墙行为需在 Task 17 以真实环境验证。
 
-
 - 2026-08-22 | Task 1 | commit c6ebf64
   - 验证：pnpm install --frozen-lockfile；pnpm format:check；pnpm lint；pnpm typecheck；pnpm test；pnpm build；GET /api/health 返回 HTTP 200 且响应不含配置路径或密钥。
   - 结果：完成 Next.js 16/React 19 工具链、冻结依赖、环境 Schema、健康快照与薄健康路由、最小移动端状态页。
   - 风险：真实 SQLite/图片/Provider、手机演示与数据库迁移留在后续任务；Qwen 和真实手机环境尚未验证。
-
 
 - 2026-08-23 | Task 2 | commit cd658b1
   - 验证：测试先行；首次可执行领域测试为 7 files、32 tests 中 31 通过，修正格式合法 UUID 负例后为 8 files、35 tests 全部通过；pnpm install --frozen-lockfile；pnpm typecheck；pnpm lint；pnpm format:check；pnpm test（10 files，40 tests）；pnpm build。pnpm test:e2e 未通过，因当前仓库没有 E2E 测试文件（No tests found）。

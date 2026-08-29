@@ -20,10 +20,10 @@
 
 按顺序阅读：
 
-1. `docs/superpowers/specs/2026-08-28-guikesong-yqz-product-pivot.md`：当前产品交互、MVP 范围和覆盖决策的最高真相源。
+1. `docs/superpowers/specs/2026-08-28-qiandiao-product-pivot.md`：当前产品交互、MVP 范围和覆盖决策的最高真相源。
 2. `Task.md`：当前 Product Pivot 实施顺序、进度、验证命令与决策记录。
 3. `PRODUCTION.md`：涉及运行、环境变量、数据库、图片、局域网、日志、备份或发布时必读。
-4. `docs/superpowers/specs/2026-08-21-baijiu-cocktail-agent-design.md`：继承的 baseline 架构参考，未被新 Spec 覆盖的后端、安全和运行决策继续有效。
+4. `docs/superpowers/specs/2026-08-21-qiandiao-architecture-design.md`：继承的 baseline 架构参考，未被新 Spec 覆盖的后端、安全和运行决策继续有效。
 5. `docs/superpowers/specs/2026-08-27-task-13-feedback-loop-design.md`：继承的 Task 13A/13B Feedback / Adjustment 后端参考；旧 Task 13C 不属于当前计划。
 6. 当前目录下更近的 `AGENTS.md`（若存在）。
 

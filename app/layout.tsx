@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "白酒创意调饮 Agent",
-  description: "手机优先的本地白酒创意调饮学习原型",
+  title: "黔调 · 白酒创意调饮 Agent",
+  description: "黔调（QianDiao）— 手机优先的本地白酒创意调饮学习原型",
 };
 
 export const viewport: Viewport = {
