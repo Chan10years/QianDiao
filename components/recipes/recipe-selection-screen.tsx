@@ -133,7 +133,7 @@ export function RecipeSelectionScreen({
       <FixedActionBar>
         <button
           type="button"
-          className="mobile-action mobile-action--primary w-full"
+          className="min-h-11 w-full rounded-2xl bg-stone-900 px-5 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
           disabled={selectedRecipe === undefined || !selectedWarnAcknowledged || isSubmitting}
           onClick={() => void handleSelect()}
         >

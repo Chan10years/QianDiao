@@ -96,9 +96,16 @@ describe("mixing screen", () => {
     expect(
       await screen.findByRole("heading", { name: "第 1 步：先加入冰块并降温。" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "第 1 步：先加入冰块并降温。" }).closest("section"),
-    ).not.toHaveClass("pb-36");
+    const mixingSection = screen
+      .getByRole("heading", { name: "第 1 步：先加入冰块并降温。" })
+      .closest("section");
+    expect(mixingSection).not.toBeNull();
+    expect(mixingSection).not.toHaveClass("pb-36");
+    expect(screen.getByRole("region", { name: "当前操作" })).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "调饮实验" })).toHaveAttribute(
+      "data-shell-bottom-spacing",
+      "action-bar",
+    );
     expect(client.getRecipeSet).toHaveBeenCalledWith(sessionId);
     expect(screen.getByRole("button", { name: "返回上一步" })).toBeDisabled();
 

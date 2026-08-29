@@ -7,6 +7,7 @@ import { MixingScreen } from "@/components/mixing/mixing-screen";
 import { PreferencesScreen } from "@/components/preferences/preferences-screen";
 import { RecipeSelectionScreen } from "@/components/recipes/recipe-selection-screen";
 import { CameraScreen } from "@/components/scan/camera-screen";
+import { MobileShell } from "@/components/session/fixed-action-bar";
 import { ProgressHeader } from "@/components/session/progress-header";
 import {
   SessionClient,
@@ -128,7 +129,7 @@ export function SessionShell(_props: SessionShellProps) {
 
   if (isLoading || snapshot === null) {
     return (
-      <main className="mobile-shell" aria-label="调饮实验" aria-busy={isLoading}>
+      <MobileShell busy={isLoading}>
         <div className="mobile-shell__inner">
           <section className="mobile-surface session-recovery-card" aria-label="会话恢复">
             {errorMessage === null ? (
@@ -155,12 +156,12 @@ export function SessionShell(_props: SessionShellProps) {
             )}
           </section>
         </div>
-      </main>
+      </MobileShell>
     );
   }
 
   return (
-    <main className="mobile-shell" aria-label="调饮实验" aria-busy={isGenerating}>
+    <MobileShell busy={isGenerating}>
       <div className="mobile-shell__inner">
         <ProgressHeader state={snapshot.session.state} />
         {errorMessage !== null ? (
@@ -344,6 +345,6 @@ export function SessionShell(_props: SessionShellProps) {
           </section>
         )}
       </div>
-    </main>
+    </MobileShell>
   );
 }

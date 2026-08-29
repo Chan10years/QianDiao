@@ -297,7 +297,7 @@ export function MixingScreen({
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              className="mobile-action mobile-action--secondary"
+              className="min-h-11 rounded-2xl border border-stone-300 px-4 py-3 text-base font-semibold text-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isSubmitting || currentStep === 0}
               onClick={() => void handleAction("BACK_MIXING")}
             >
@@ -305,7 +305,7 @@ export function MixingScreen({
             </button>
             <button
               type="button"
-              className="mobile-action mobile-action--primary"
+              className="min-h-11 rounded-2xl bg-stone-900 px-4 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
               disabled={isSubmitting}
               onClick={() => void handleAction("ADVANCE_MIXING")}
             >

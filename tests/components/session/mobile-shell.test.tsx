@@ -23,6 +23,11 @@ const preferencesSnapshot: SessionSnapshot = {
   },
 };
 
+const readySnapshot: SessionSnapshot = {
+  ...preferencesSnapshot,
+  session: { ...preferencesSnapshot.session, state: "READY", version: 2 },
+};
+
 function makeClient(overrides: Partial<SessionClientLike> = {}): SessionClientLike {
   return {
     getSession: vi.fn().mockResolvedValue(preferencesSnapshot),
@@ -41,6 +46,47 @@ function makeClient(overrides: Partial<SessionClientLike> = {}): SessionClientLi
 
 describe("mobile shell", () => {
   afterEach(() => cleanup());
+
+  it("uses the larger shell bottom spacing when a fixed action bar is rendered", () => {
+    render(
+      <SessionShell
+        sessionId={preferencesSnapshot.session.id}
+        client={makeClient({ getSession: vi.fn().mockResolvedValue(preferencesSnapshot) })}
+        initialSnapshot={preferencesSnapshot}
+      />,
+    );
+
+    const main = screen.getByRole("main", { name: "调饮实验" });
+    expect(screen.getByRole("region", { name: "当前操作" })).toBeInTheDocument();
+    expect(main).toHaveAttribute("data-shell-bottom-spacing", "action-bar");
+  });
+
+  it("uses normal shell bottom spacing for READY without a fixed action bar", () => {
+    render(
+      <SessionShell
+        sessionId={readySnapshot.session.id}
+        client={makeClient({ getSession: vi.fn().mockResolvedValue(readySnapshot) })}
+        initialSnapshot={readySnapshot}
+      />,
+    );
+
+    const main = screen.getByRole("main", { name: "调饮实验" });
+    expect(screen.queryByRole("region", { name: "当前操作" })).not.toBeInTheDocument();
+    expect(main).toHaveAttribute("data-shell-bottom-spacing", "normal");
+  });
+
+  it("uses normal shell bottom spacing for initial recovery errors without a fixed action bar", async () => {
+    const client = makeClient({
+      getSession: vi.fn().mockRejectedValue(new Error("会话暂时不可用")),
+    });
+
+    render(<SessionShell sessionId={preferencesSnapshot.session.id} client={client} />);
+
+    await screen.findByRole("alert");
+    const main = screen.getByRole("main", { name: "调饮实验" });
+    expect(screen.queryByRole("region", { name: "当前操作" })).not.toBeInTheDocument();
+    expect(main).toHaveAttribute("data-shell-bottom-spacing", "normal");
+  });
 
   it("names the main landmark and exposes busy semantics while restoring a session", () => {
     const getSession = vi.fn(() => new Promise<SessionSnapshot>(() => undefined));

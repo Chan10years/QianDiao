@@ -114,8 +114,11 @@ input[type="range"] {
   min-height: 100svh;
   overflow-x: clip;
   padding: max(1.5rem, env(safe-area-inset-top, 0px)) max(1.375rem, env(safe-area-inset-right, 0px))
-    calc(var(--mobile-action-bar-reserve) + env(safe-area-inset-bottom, 0px))
-    max(1.375rem, env(safe-area-inset-left, 0px));
+    max(1.5rem, env(safe-area-inset-bottom, 0px)) max(1.375rem, env(safe-area-inset-left, 0px));
+}
+
+.mobile-shell[data-shell-bottom-spacing="action-bar"] {
+  padding-bottom: calc(var(--mobile-action-bar-reserve) + env(safe-area-inset-bottom, 0px));
 }
 
 .mobile-shell::before {
