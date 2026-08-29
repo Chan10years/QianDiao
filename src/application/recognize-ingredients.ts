@@ -53,7 +53,7 @@ const RecognitionResponseSchema = SuccessEnvelopeSchema(
 );
 
 const IDEMPOTENCY_PENDING_STATUS_CODE = 102;
-export const RECOGNITION_LEASE_DURATION_MS = 15_000;
+export const RECOGNITION_LEASE_DURATION_MS = 60_000;
 const IDEMPOTENCY_WAIT_ATTEMPTS = 600;
 const IDEMPOTENCY_WAIT_MS = 10;
 
