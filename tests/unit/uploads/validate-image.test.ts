@@ -26,7 +26,7 @@ async function createImage(
 }
 
 describe("validateImage", () => {
-  it("accepts real JPEG, PNG, and WebP bytes only when extension and MIME agree", async () => {
+  it("accepts real JPEG, PNG, and WebP bytes", async () => {
     const cases = [
       { format: "jpeg" as const, filename: "valid.jpg", mime: "image/jpeg" },
       { format: "png" as const, filename: "valid.png", mime: "image/png" },
@@ -50,27 +50,38 @@ describe("validateImage", () => {
     }
   });
 
-  it("rejects a fake JPEG whose bytes are actually PNG", async () => {
+  it("accepts a PNG filename and declaration when the bytes are actually JPEG", async () => {
+    const jpeg = await createImage("jpeg");
+
+    const result = await validateImage(
+      { filename: "tmp_img.png", declaredMime: "image/png", bytes: jpeg },
+      limits,
+    );
+
+    expect(result.mime).toBe("image/jpeg");
+  });
+
+  it("accepts a JPG filename and declaration when the bytes are actually PNG", async () => {
     const png = await createImage("png");
 
+    const result = await validateImage(
+      { filename: "tmp_img.jpg", declaredMime: "image/jpeg", bytes: png },
+      limits,
+    );
+
+    expect(result.mime).toBe("image/png");
+  });
+
+  it("rejects bytes that are not an image", async () => {
     await expect(
-      validateImage({ filename: "fake.jpg", declaredMime: "image/jpeg", bytes: png }, limits),
+      validateImage(
+        { filename: "not-an-image.png", declaredMime: "image/png", bytes: Buffer.from("not an image") },
+        limits,
+      ),
     ).rejects.toMatchObject({
       code: "UNSUPPORTED_MEDIA_TYPE",
       status: 415,
     });
-  });
-
-  it("rejects mismatched extensions and declared MIME types", async () => {
-    const png = await createImage("png");
-
-    await expect(
-      validateImage({ filename: "valid.jpg", declaredMime: "image/png", bytes: png }, limits),
-    ).rejects.toMatchObject({ code: "UNSUPPORTED_MEDIA_TYPE" });
-
-    await expect(
-      validateImage({ filename: "valid.png", declaredMime: "image/jpeg", bytes: png }, limits),
-    ).rejects.toMatchObject({ code: "UNSUPPORTED_MEDIA_TYPE" });
   });
 
   it("rejects bytes over the configured limit before decoding", async () => {

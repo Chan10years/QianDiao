@@ -1,4 +1,3 @@
-import path from "node:path";
 import sharp from "sharp";
 
 export const DEFAULT_MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
@@ -37,13 +36,6 @@ export class ImageValidationError extends Error {
     this.name = "ImageValidationError";
   }
 }
-
-const mimeByExtension: Record<string, SupportedImageMime> = {
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-};
 
 function unsupported(message: string): ImageValidationError {
   return new ImageValidationError("UNSUPPORTED_MEDIA_TYPE", 415, message);
@@ -84,26 +76,14 @@ export async function validateImage(
   }
 
   const declaredMime = input.declaredMime.trim().toLowerCase();
-  const extensionMime = mimeByExtension[path.extname(input.filename).toLowerCase()];
 
   if (declaredMime === "image/heic" || declaredMime === "image/heif") {
     throw unsupported("当前暂不支持 HEIC/HEIF，请改用 JPEG 或相机兼容模式");
   }
 
-  if (
-    !supportedImageMimes.includes(declaredMime as SupportedImageMime) ||
-    extensionMime === undefined
-  ) {
-    throw unsupported("仅支持 JPEG、PNG 或 WebP 图片");
-  }
-
-  if (extensionMime !== declaredMime) {
-    throw unsupported("文件扩展名与声明的 MIME 类型不匹配");
-  }
-
   const detectedMime = detectMime(bytes);
-  if (detectedMime !== declaredMime) {
-    throw unsupported("文件内容与声明的图片类型不匹配");
+  if (detectedMime === null) {
+    throw unsupported("仅支持 JPEG、PNG 或 WebP 图片");
   }
 
   let metadata: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
@@ -130,5 +110,5 @@ export async function validateImage(
     throw new ImageValidationError("FILE_TOO_LARGE", 413, "图片像素总量过大");
   }
 
-  return { bytes, mime: declaredMime as SupportedImageMime, width, height };
+  return { bytes, mime: detectedMime, width, height };
 }

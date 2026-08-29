@@ -82,7 +82,7 @@ function requestWithFile(
 }
 
 describe("image upload route handlers", () => {
-  it("returns 415 for a fake image whose declared MIME and extension do not match its bytes", async () => {
+  it("accepts a supported image when its declared MIME and extension do not match its bytes", async () => {
     const context = createScanSession();
 
     try {
@@ -95,8 +95,8 @@ describe("image upload route handlers", () => {
         { params: Promise.resolve({ sessionId: context.sessionId }) },
       );
 
-      expect(response.status).toBe(415);
-      expect((await response.json()).error.code).toBe("UNSUPPORTED_MEDIA_TYPE");
+      expect(response.status).toBe(201);
+      expect((await response.json()).data.image.mime).toBe("image/jpeg");
     } finally {
       context.database.cleanup();
       rmSync(context.uploadDirectory, { recursive: true, force: true });
