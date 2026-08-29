@@ -52,7 +52,7 @@ flowchart LR
 
 ## 4. 配置契约
 
-所有随部署变化的配置使用环境变量。真实 `.env.local` 不提交 Git；仓库只提供 `.env.example`。
+所有随部署变化的配置使用环境变量。真实 `.env.local` 不提交 Git；仓库只提供 `.env.example`。`DASHSCOPE_API_KEY` 从系统环境变量（如 `~/.zshrc` 的 `export`）读取，不落入项目内任何文件。
 
 计划中的配置 Schema：
 
@@ -68,7 +68,7 @@ flowchart LR
 | `MAX_IMAGE_PIXELS` | 是 | `40000000` | 单图 40 MP |
 | `IMAGE_LONG_EDGE` | 是 | `2048` | 标准化长边 |
 | `AI_MODE` | 是 | `fallback` / `qwen` | 启动模式必须显式 |
-| `DASHSCOPE_API_KEY` | 条件 | 不写示例密钥 | `AI_MODE=qwen` 时必需 |
+| `DASHSCOPE_API_KEY` | 条件 | 不写示例密钥 | `AI_MODE=qwen` 时必需；从系统环境变量读取，不写入 `.env.local` |
 | `QWEN_BASE_URL` | 条件 | Provider 官方地址 | 服务端使用 |
 | `QWEN_RECIPE_MODEL` | 条件 | `qwen3.7-plus` | 配方模型，可替换 |
 | `QWEN_VISION_MODEL` | 条件 | 由接入任务确认 | 视觉模型，可替换 |
@@ -84,7 +84,7 @@ flowchart LR
 - 禁止 `NEXT_PUBLIC_DASHSCOPE_API_KEY` 或任何公开密钥变量。
 - 密钥不出现在 URL、日志、错误响应、截图、测试快照和 `decision_events`。
 - 泄漏后先吊销/轮换，不以“删掉 Git 中那一行”作为完整修复。
-- 公开互联网部署时使用托管秘密系统；本地演示只允许受控 `.env.local`。
+- 公开互联网部署时使用托管秘密系统；本地演示的密钥只允许系统环境变量（`~/.zshrc` 的 `export`），`.env.local` 仅承载非敏感本地配置。
 
 ## 5. 首次安装
 
