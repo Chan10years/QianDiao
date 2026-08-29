@@ -94,20 +94,25 @@ export function SatisfactionScreen({
   }
 
   return (
-    <section className="space-y-5" aria-label="成品反馈">
-      <div className="mobile-surface p-6">
+    <section className={`satisfaction-screen satisfaction-screen--${phase}`} aria-label="成品反馈">
+      <div className="satisfaction-screen__intro">
+        {phase === "satisfaction" ? (
+          <div className="seal" aria-hidden="true">
+            黔味
+          </div>
+        ) : null}
         <div className="mobile-page-header">
           <p className="mobile-eyebrow">第六步 · 成品反馈</p>
-          <h1>{phase === "satisfaction" ? "满意吗？" : "想怎么调整？"}</h1>
+          <h1>{phase === "satisfaction" ? "这一杯，满意吗？" : "下一版，往哪调？"}</h1>
           <p>
             {phase === "satisfaction"
-              ? "先告诉我们这杯的整体感受，满意就收尾，不满意才需要填写调整。"
-              : "用相对方向描述这杯哪里不对，系统会生成一版调整方案。"}
+              ? "满意就收下这一杯；还想调整，再告诉我一点方向。"
+              : "用相对方向描述感受，下一版会基于这次反馈重新调配。"}
           </p>
         </div>
       </div>
 
-      <div className="mobile-surface space-y-2 p-6">
+      <div className="satisfaction-screen__recipe">
         <p className="mobile-eyebrow">
           当前配方 · V{currentRecipe.version} · {currentRecipe.candidate.title}
         </p>
@@ -115,7 +120,7 @@ export function SatisfactionScreen({
           {safetyLabel(currentRecipe)}
           {currentRecipe.safety.reasons.length > 0 ? ` · ${currentRecipe.safety.reasons[0]}` : ""}
         </p>
-        <ul className="space-y-1 text-sm leading-6 text-stone-700">
+        <ul>
           {currentRecipe.candidate.materials.map((material) => (
             <li key={`${material.name}-${material.amountMl}`}>
               {material.name} · {material.amountMl} {material.unit}
@@ -151,7 +156,7 @@ export function SatisfactionScreen({
           </div>
         </FixedActionBar>
       ) : (
-        <div className="mobile-surface space-y-5 p-6">
+        <div className="satisfaction-screen__adjustment-form">
           {DIMENSIONS.map((dimension) => (
             <fieldset key={dimension.key} className="taste-control">
               <legend>{dimension.label}</legend>
@@ -184,12 +189,12 @@ export function SatisfactionScreen({
           ))}
 
           <div className="space-y-2">
-            <label htmlFor="adjustment-notes" className="text-sm font-semibold text-stone-900">
+            <label htmlFor="adjustment-notes" className="satisfaction-screen__notes-label">
               补充说明（可选）
             </label>
             <textarea
               id="adjustment-notes"
-              className="w-full rounded-2xl border border-stone-300 bg-white p-3 text-sm leading-6 text-stone-900"
+              className="satisfaction-screen__notes"
               rows={3}
               maxLength={2000}
               value={notes}

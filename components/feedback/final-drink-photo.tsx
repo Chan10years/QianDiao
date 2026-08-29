@@ -105,13 +105,11 @@ export function FinalDrinkPhoto({
         <p>可以拍一张这杯成品的照片留档，也可以直接完成。拍摄完全可选，跳过不影响完成。</p>
       </header>
 
-      <div className="mobile-surface space-y-2 p-6">
+      <div className="final-drink__recipe-note">
         <p className="mobile-eyebrow">
           当前配方 · V{currentRecipe.version} · {currentRecipe.candidate.title}
         </p>
-        <p className="text-sm leading-6 text-stone-700">
-          成品照只作为实验记录，不参与安全判断或自动评分。
-        </p>
+        <p>成品照只作为实验记录，不参与安全判断或自动评分。</p>
       </div>
 
       {errorMessage !== null ? (
@@ -121,12 +119,12 @@ export function FinalDrinkPhoto({
         </div>
       ) : null}
 
-      <div className="scan-card">
+      <div className="scan-card final-drink__upload-card">
         <div className="scan-frame">
           {file === null ? (
             <label className="scan-frame__empty" htmlFor="final-drink-image">
-              <strong>拍摄成品</strong>
-              <small>这一杯 · 可选</small>
+              <strong>拍下这一杯</strong>
+              <small>成品照 · 可选留档</small>
             </label>
           ) : (
             <>

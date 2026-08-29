@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import "./final-ui-polish.css";
 
 export const metadata: Metadata = {
   title: "黔调 · 白酒创意调饮 Agent",

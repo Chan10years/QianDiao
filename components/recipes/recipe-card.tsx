@@ -24,55 +24,51 @@ export function RecipeCard({
   const isWarn = recipe.safety.level === "WARN";
 
   return (
-    <article className="space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-200">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium tracking-wide text-amber-700">
-            {strategyLabel[recipe.strategy]}
-          </p>
-          <h2 className="mt-1 text-xl font-semibold text-stone-900">{recipe.title}</h2>
+    <article className="recipe-card">
+      <header className="recipe-card__header">
+        <div className="recipe-card__heading">
+          <p className="recipe-card__eyebrow">{strategyLabel[recipe.strategy]}</p>
+          <h2>{recipe.title}</h2>
         </div>
-        {recommended ? (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
-            推荐方案
-          </span>
-        ) : null}
-      </div>
+        {recommended ? <span className="recipe-card__recommendation">推荐方案</span> : null}
+      </header>
 
-      <p className="text-sm leading-6 text-stone-600">{recipe.fitReason}</p>
-      <p className="rounded-2xl bg-stone-50 p-3 text-sm leading-6 text-stone-700">
-        为什么不同：{recipe.differenceReason}
+      <p className="recipe-card__fit">{recipe.fitReason}</p>
+      <p className="recipe-card__first-taste">
+        <strong>第一口感</strong>
+        <span>{recipe.differenceReason}</span>
       </p>
 
-      <div>
-        <h3 className="font-semibold text-stone-900">材料与用量</h3>
-        <ul className="mt-2 space-y-1 text-sm text-stone-700">
+      <section className="recipe-card__recipe-line">
+        <h3>配方与用量</h3>
+        <ul>
           {recipe.materials.map((material) => (
             <li key={`${material.name}-${material.amountMl}`}>
               {material.name} · {material.amountMl} {material.unit}
             </li>
           ))}
         </ul>
+      </section>
+
+      <div className="recipe-card__tags" aria-label="配方特征">
+        <span>
+          预计 {recipe.estimatedAbv === null ? "ABV 待确认" : `${recipe.estimatedAbv}% ABV`}
+        </span>
+        <span>
+          {recipe.missingIngredients.length > 0
+            ? `缺少：${recipe.missingIngredients.join("、")}`
+            : "材料齐备"}
+        </span>
       </div>
 
-      <p className="text-sm font-medium text-stone-700">
-        预计 ABV：{recipe.estimatedAbv === null ? "待确认" : `${recipe.estimatedAbv}%`}
-      </p>
-
-      <div>
-        <h3 className="font-semibold text-stone-900">调制步骤</h3>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-stone-700">
+      <section className="recipe-card__steps">
+        <h3>调制步骤</h3>
+        <ol>
           {recipe.steps.map((step) => (
             <li key={step.order}>{step.instruction}</li>
           ))}
         </ol>
-      </div>
-
-      {recipe.missingIngredients.length > 0 ? (
-        <p className="text-sm text-stone-700">缺失材料：{recipe.missingIngredients.join("、")}</p>
-      ) : (
-        <p className="text-sm text-stone-700">缺失材料：无</p>
-      )}
+      </section>
 
       <SafetyBadge safety={recipe.safety} />
 

@@ -72,8 +72,7 @@ export function RecipeSelectionScreen({
   const exhausted = currentRecipe === undefined;
   const currentWarnAcknowledged =
     currentRecipe !== undefined &&
-    (currentRecipe.safety.level !== "WARN" ||
-      warningAcknowledgements.has(currentRecipe.id));
+    (currentRecipe.safety.level !== "WARN" || warningAcknowledgements.has(currentRecipe.id));
   const canAccept = currentRecipe !== undefined && currentWarnAcknowledged && !isSubmitting;
 
   function acknowledgeWarning(recipeId: string, checked: boolean) {
@@ -164,26 +163,37 @@ export function RecipeSelectionScreen({
   }
 
   return (
-    <section className="space-y-6">
-      <div className="space-y-3">
-        <p className="text-sm font-medium tracking-wide text-amber-700">第五步 · 选择方案</p>
-        <h1 className="text-3xl leading-tight font-semibold text-stone-900">选择一套配方</h1>
-        <p className="leading-7 text-stone-600">
-          系统按推荐顺序逐张展示方案。左滑或点“不要这杯”看下一套，右滑或点“选这杯”开始调饮。
-        </p>
-      </div>
+    <section className="recipe-selection">
+      <header className="mobile-page-header recipe-selection__header">
+        <p className="mobile-eyebrow">第五步 · 一次一张</p>
+        <h1>这一批，先从一张开始。</h1>
+        <p>按推荐顺序慢慢看。左滑略过，右滑或点击选择，就从这一杯开始调。</p>
+      </header>
+
+      {!exhausted ? (
+        <div className="batch-bar" aria-label={`当前第 ${cursor + 1} 套，共 ${deck.length} 套`}>
+          <div className="batch-bar__marks" aria-hidden="true">
+            {deck.map((recipe, index) => (
+              <span key={recipe.id} className={index <= cursor ? "is-active" : undefined} />
+            ))}
+          </div>
+          <p>
+            <span>本批进度</span>
+            <strong>
+              {cursor + 1} / {deck.length}
+            </strong>
+          </p>
+        </div>
+      ) : null}
 
       {errorMessage !== null ? (
-        <div
-          role="alert"
-          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-        >
+        <div role="alert" className="mobile-notice mobile-notice--error">
           {errorMessage}
         </div>
       ) : null}
 
       {blockedRecipes.length > 0 ? (
-        <aside className="space-y-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900">
+        <aside className="mobile-notice mobile-notice--error space-y-2">
           <p className="font-semibold">
             已隐藏 {blockedRecipes.length} 个 BLOCK 方案，仅保留审计摘要。
           </p>
@@ -196,24 +206,16 @@ export function RecipeSelectionScreen({
       ) : null}
 
       {exhausted ? (
-        <section
-          aria-label="本批方案已看完"
-          className="mobile-surface space-y-3 p-6 text-center"
-        >
-          <p className="text-lg font-semibold text-stone-900">本批方案已全部看完</p>
-          <p className="text-sm leading-6 text-stone-600">
-            当前三套方案都已跳过，可以生成一批新的三套方案。
-          </p>
+        <section aria-label="本批方案已看完" className="recipe-selection__exhausted">
+          <p>本批方案已全部看完</p>
+          <p>当前三套方案都已跳过，可以生成一批新的三套方案。</p>
         </section>
       ) : (
         <>
-          <p aria-live="polite" className="text-sm font-medium text-stone-600">
-            第 {cursor + 1} / {deck.length} 套
-          </p>
           <div
             role="region"
             aria-label="配方卡片滑动区"
-            className="overflow-hidden"
+            className="recipe-selection__swipe-area"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -221,7 +223,7 @@ export function RecipeSelectionScreen({
           >
             <div
               key={currentRecipe.id}
-              className="touch-pan-y"
+              className="recipe-selection__card-motion touch-pan-y"
               style={
                 dragDx !== 0 && !prefersReducedMotion
                   ? { transform: `translateX(${dragDx}px)` }
@@ -236,6 +238,10 @@ export function RecipeSelectionScreen({
               />
             </div>
           </div>
+          <p className="swipe-hint" aria-live="polite">
+            <span>← 左滑 · 继续看看</span>
+            <strong>右滑 · 就是这杯 →</strong>
+          </p>
         </>
       )}
 
@@ -243,17 +249,17 @@ export function RecipeSelectionScreen({
         {exhausted ? (
           <button
             type="button"
-            className="min-h-11 w-full rounded-2xl bg-stone-900 px-5 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+            className="mobile-action mobile-action--primary w-full"
             disabled={isRegenerating}
             onClick={() => void handleRegenerate()}
           >
             {isRegenerating ? "正在换一批…" : "换一批"}
           </button>
         ) : (
-          <div className="flex gap-3">
+          <div className="swipe-actions">
             <button
               type="button"
-              className="min-h-11 flex-1 rounded-2xl border border-stone-300 px-4 py-3 text-base font-semibold text-stone-900 disabled:cursor-not-allowed disabled:text-stone-400"
+              className="mobile-action mobile-action--secondary w-full"
               disabled={isSubmitting}
               onClick={handleReject}
             >
@@ -261,7 +267,7 @@ export function RecipeSelectionScreen({
             </button>
             <button
               type="button"
-              className="min-h-11 flex-1 rounded-2xl bg-stone-900 px-4 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-stone-400"
+              className="mobile-action mobile-action--primary w-full"
               disabled={!canAccept}
               onClick={() => void handleAccept()}
             >

@@ -28,23 +28,11 @@ const STEP_STATE_LABELS = {
 type StepState = keyof typeof STEP_STATE_LABELS;
 
 function stepStateClassName(state: StepState): string {
-  if (state === "current") {
-    return "flex items-start gap-3 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200";
-  }
-  if (state === "completed") {
-    return "flex items-start gap-3 rounded-2xl p-4 opacity-75";
-  }
-  return "flex items-start gap-3 rounded-2xl p-4 opacity-45";
+  return `mixing-step mixing-step--${state}`;
 }
 
 function stepBadgeClassName(state: StepState): string {
-  if (state === "current") {
-    return "flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-600 text-sm font-bold text-white";
-  }
-  if (state === "completed") {
-    return "flex size-9 shrink-0 items-center justify-center rounded-full bg-stone-800 text-sm font-bold text-white";
-  }
-  return "flex size-9 shrink-0 items-center justify-center rounded-full bg-stone-200 text-sm font-bold text-stone-500";
+  return `mixing-step__badge mixing-step__badge--${state}`;
 }
 
 export function MixingScreen({
@@ -88,16 +76,14 @@ export function MixingScreen({
   }
 
   return (
-    <section className="space-y-5" aria-label="分步调饮">
-      <div className="mobile-surface p-6">
+    <section className="mixing-screen" aria-label="分步调饮">
+      <div className="mixing-screen__guide">
         <div className="mobile-page-header">
           <p className="mobile-eyebrow">
             分步调饮 · 第 {currentStep + 1} / {recipe.steps.length} 步
           </p>
-          <h1>
-            第 {currentStep + 1} 步：{step.instruction}
-          </h1>
-          <p>共 {recipe.steps.length} 步 · 进度由服务端记录，刷新后从当前步骤继续</p>
+          <h1>跟着做，这一杯很快就好。</h1>
+          <p>本次共 {recipe.steps.length} 步，当前进度会安全保存在会话中。</p>
         </div>
       </div>
 
@@ -108,7 +94,7 @@ export function MixingScreen({
         </div>
       ) : null}
 
-      <ol className="mobile-surface space-y-1 p-3" aria-label="调饮步骤索引">
+      <ol className="step-index" aria-label="调饮步骤索引">
         {recipe.steps.map((recipeStep, index) => {
           const state: StepState =
             index < currentStep ? "completed" : index === currentStep ? "current" : "pending";
@@ -122,35 +108,28 @@ export function MixingScreen({
               <span aria-hidden="true" className={stepBadgeClassName(state)}>
                 {state === "completed" ? "✓" : index + 1}
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs tracking-wide text-stone-500">
+              <div className="mixing-step__copy">
+                <p>
                   第 {index + 1} 步 · {STEP_STATE_LABELS[state]}
                 </p>
-                <p
-                  className={
-                    state === "current"
-                      ? "mt-0.5 text-base leading-7 font-semibold text-stone-900"
-                      : "mt-0.5 text-sm leading-6 text-stone-700"
-                  }
-                >
-                  {recipeStep.instruction}
-                </p>
+                <p className="mixing-step__instruction">{recipeStep.instruction}</p>
               </div>
             </li>
           );
         })}
       </ol>
 
-      <div className="mobile-surface space-y-3 p-6">
-        <h2 className="text-lg font-bold text-stone-900">本配方用量</h2>
-        <ul className="space-y-1 text-sm leading-6 text-stone-700">
+      <div className="mixing-screen__measure">
+        <p className="mobile-eyebrow">当前这一步 · 用量参考</p>
+        <h2>{step.instruction}</h2>
+        <ul>
           {recipe.materials.map((material) => (
             <li key={`${material.name}-${material.amountMl}`}>
               {material.name} · {material.amountMl} {material.unit}
             </li>
           ))}
         </ul>
-        <p className="mobile-notice mobile-notice--warning">
+        <p className="mixing-screen__note">
           按步骤逐步加入材料，完成当前操作后再进入下一步。普通步骤不要求拍照。
         </p>
       </div>

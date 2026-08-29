@@ -25,23 +25,28 @@ function safetyLabel(recipe: VersionedRecipeReadModel): string {
  */
 export function CompletedScreen({ recipe }: CompletedScreenProps) {
   return (
-    <section className="mobile-screen space-y-6" aria-label="调饮完成">
-      <header className="mobile-page-header">
+    <section className="completed-screen" aria-label="调饮完成">
+      <header className="completed-screen__hero">
         <p className="mobile-eyebrow">完成</p>
-        <h1>调饮完成</h1>
+        <div className="completed-stamp">COMPLETED</div>
+        <h1>
+          贵州风味，
+          <br />
+          已被你喝出来。
+        </h1>
         <p>这一轮调饮实验已经完成，感谢你的记录。</p>
       </header>
 
       {recipe !== null ? (
-        <div className="mobile-surface space-y-2 p-6">
+        <div className="completed-screen__recipe">
           <p className="mobile-eyebrow">
             最终配方 · V{recipe.version} · {recipe.candidate.title}
           </p>
-          <p className="text-sm leading-6 text-stone-700">
+          <p>
             {safetyLabel(recipe)}
             {recipe.safety.reasons.length > 0 ? ` · ${recipe.safety.reasons[0]}` : ""}
           </p>
-          <ul className="space-y-1 text-sm leading-6 text-stone-700">
+          <ul>
             {recipe.candidate.materials.map((material) => (
               <li key={`${material.name}-${material.amountMl}`}>
                 {material.name} · {material.amountMl} {material.unit}

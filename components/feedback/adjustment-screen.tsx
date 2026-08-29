@@ -101,7 +101,7 @@ export function AdjustmentScreen({
 
   if (isGenerating) {
     return (
-      <section role="status" aria-live="polite" className="mobile-surface p-6">
+      <section role="status" aria-live="polite" className="adjustment-screen__loading">
         正在生成调整方案…
       </section>
     );
@@ -109,8 +109,8 @@ export function AdjustmentScreen({
 
   if (proposal === null) {
     return (
-      <section className="space-y-5" aria-label="调整配方">
-        <div className="mobile-surface p-6">
+      <section className="adjustment-screen" aria-label="调整配方">
+        <div className="adjustment-screen__intro">
           <div className="mobile-page-header">
             <p className="mobile-eyebrow">第七步 · 调整配方</p>
             <h1>生成调整方案</h1>
@@ -137,8 +137,8 @@ export function AdjustmentScreen({
   }
 
   return (
-    <section className="space-y-5" aria-label="调整配方">
-      <div className="mobile-surface p-6">
+    <section className="adjustment-screen" aria-label="调整配方">
+      <div className="adjustment-screen__intro">
         <div className="mobile-page-header">
           <p className="mobile-eyebrow">第七步 · 调整配方</p>
           <h1>{proposal.candidate.title}</h1>
@@ -153,14 +153,17 @@ export function AdjustmentScreen({
         </div>
       ) : null}
 
-      <div className="mobile-surface space-y-3 p-6">
-        <p className="mobile-eyebrow">
-          调整方案 · V{proposal.version} · {safetyLabel(proposal)}
-        </p>
+      <div className="adjustment-screen__version-note">
+        <span>当前版本 V{currentRecipe.version}</span>
+        <strong>→ V{proposal.version}</strong>
+      </div>
+
+      <div className="adjustment-screen__recipe">
+        <p className="mobile-eyebrow">调整方案 · {safetyLabel(proposal)}</p>
         {proposal.safety.reasons.length > 0 ? (
           <p className="text-sm leading-6 text-stone-700">{proposal.safety.reasons[0]}</p>
         ) : null}
-        <ul className="space-y-1 text-sm leading-6 text-stone-700">
+        <ul>
           {proposal.candidate.materials.map((material) => (
             <li key={`${material.name}-${material.amountMl}`}>
               {material.name} · {material.amountMl} {material.unit}
@@ -169,9 +172,9 @@ export function AdjustmentScreen({
         </ul>
       </div>
 
-      <div className="mobile-surface space-y-3 p-6">
-        <h2 className="text-lg font-bold text-stone-900">怎么调</h2>
-        <ol className="space-y-1 text-sm leading-6 text-stone-700">
+      <div className="adjustment-screen__steps">
+        <h2>怎么调</h2>
+        <ol>
           {proposal.candidate.steps.map((step, index) => (
             <li key={step.order}>
               第 {index + 1} 步 · {step.instruction}
