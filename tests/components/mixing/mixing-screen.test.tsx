@@ -219,7 +219,28 @@ describe("mixing screen", () => {
           resolveAdvanceRef.current = resolve;
         }),
     );
+    const selectedRecipe = fixture.recipeSet.recipeSet.recipes[0];
+    if (selectedRecipe === undefined) {
+      throw new Error("expected selected recipe");
+    }
     const client = createClient(fixture, advanceMixing);
+    client.getAdjustmentState = vi.fn().mockResolvedValue({
+      data: {
+        currentRecipe: {
+          recipeId: selectedRecipe.id,
+          recipeSetId: fixture.recipeSet.recipeSet.id,
+          candidate: selectedRecipe,
+          version: 1,
+          parentRecipeId: null,
+          feedbackId: null,
+          safety: selectedRecipe.safety,
+          isSelected: true,
+        },
+        proposal: null,
+        pendingFeedbackId: null,
+      },
+      session: { id: sessionId, state: "FEEDBACK", version: 4 },
+    });
 
     render(<SessionShell sessionId={sessionId} client={client} />);
 
@@ -240,9 +261,10 @@ describe("mixing screen", () => {
       session: { id: sessionId, state: "FEEDBACK", version: 4 },
     });
     await waitFor(() => {
-      // Task 5：最后一步进入 FEEDBACK 后由满意优先反馈接手（恢复 adjustmentState）。
-      expect(screen.getByText("正在恢复反馈状态…")).toBeInTheDocument();
+      // 最后一步进入 FEEDBACK 后，shell 必须补拉 adjustmentState 才能渲染反馈首屏。
+      expect(screen.getByRole("heading", { name: "满意吗？" })).toBeInTheDocument();
     });
+    expect(client.getAdjustmentState).toHaveBeenCalledWith(sessionId);
     expect(screen.queryByRole("button", { name: "完成最后一步" })).not.toBeInTheDocument();
   });
 

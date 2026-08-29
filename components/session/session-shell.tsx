@@ -374,6 +374,23 @@ export function SessionShell(_props: SessionShellProps) {
                           session: result.session,
                         },
                   );
+                  if (result.session.state === "FEEDBACK") {
+                    void conflictAwareClient
+                      .getAdjustmentState(sessionId)
+                      .then((adjustmentSnapshot) => {
+                        setAdjustmentState(adjustmentSnapshot.data);
+                        setSnapshot((current) =>
+                          current === null
+                            ? current
+                            : { ...current, session: adjustmentSnapshot.session },
+                        );
+                      })
+                      .catch((error: unknown) => {
+                        setErrorMessage(
+                          error instanceof Error ? error.message : "无法恢复反馈状态，请重试",
+                        );
+                      });
+                  }
                 }}
               />
             );

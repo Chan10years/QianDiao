@@ -323,10 +323,10 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 先写第一个真正可运行的 RED E2E，确认不是 `No tests found`。
-- [ ] 配置隔离 test database/upload directory 和 deterministic fallback fixture。
-- [ ] 实现完整流程 E2E 与网络故障注入，先让关键断言 GREEN。
-- [ ] 运行 `pnpm test:e2e`、全量质量门禁和空数据库迁移回归。
+- [x] 先写第一个真正可运行的 RED E2E，确认不是 `No tests found`。
+- [x] 配置隔离 test database/upload directory 和 deterministic fallback fixture。
+- [x] 实现完整流程 E2E 与网络故障注入，先让关键断言 GREEN。
+- [x] 运行 `pnpm test:e2e`、全量质量门禁和空数据库迁移回归。
 - [ ] 提交并等待独立 Review；Review PASS 后才进入 Task 8。
 
 **Acceptance:** `pnpm test:e2e` 实际发现并执行测试；完整闭环和恢复场景可重复；任何关键 E2E 失败阻塞发布；测试不触碰真实 `data/` 或秘密。
@@ -403,7 +403,7 @@ Task 8 Real Provider + Real Phone Demo Freeze
 - [ ] `FINAL_PHOTO` 不存在；分享、拒绝原因调查和旧 Task 13C 不进入当前 MVP。
 - [ ] 所有候选和调整版本经 Zod、deterministic Safety；BLOCK 无绕过。
 - [ ] `requestId`、`expectedVersion`、事务和刷新恢复在新增路径成立。
-- [ ] Task 7 之后 `pnpm test:e2e` 不再是 `No tests found`，并作为阻塞门禁。
+- [x] Task 7 之后 `pnpm test:e2e` 不再是 `No tests found`，并作为阻塞门禁。
 - [ ] Task 8 真实 Provider/fallback、真实手机三次彩排、备份恢复和最终门禁有证据。
 
 ## Progress log
@@ -452,6 +452,10 @@ YYYY-MM-DD | Task N | commit <sha>
   - 验证：`final-drink-photo.test.tsx`、`completed-screen.test.tsx` 定向测试通过；`feedback-adjustment.test.ts` 新增带 finalImageId 原子完成集成测试；`task-13-feedback-routes.test.ts` 新增 API 路径完成测试；`pnpm typecheck`、修改文件 targeted Prettier 通过。真实浏览器 402×874（fallback Provider + 隔离数据）验证两条满意路径：A 拍照上传并完成（version 8→10，COMPLETED）、B 跳过直接完成（version 8→9，COMPLETED）；路径 A 完成后 reload 恢复到"调饮完成"页面且无任何 mutation 调用。Hackathon Sprint Mode 下未运行全量门禁。
   - 结果：FinalDrinkPhoto 接手 satisfied-closing——可选 final drink 拍摄/预览/替换/上传（失败保留重试与跳过出口），拍摄或跳过后调用 `saveFeedback(accepted=true, finalImageId=uuid|null)` 原子完成会话；CompletedScreen 展示最终配方 Vn、安全结论与材料清单，完成状态恢复为只读。
   - 风险：独立 Reviewer 尚未审查；全量门禁待统一执行。
+- 2026-08-29 | Task 7 | Full Recovery + Playwright E2E | implementation pending independent Review
+  - 验证：`pnpm test:e2e --project=mobile-chromium` 5 tests passed / 1 worker；覆盖首页创建、fallback 识别与三卡合同、三张全拒绝后主动换批、Mixing 刷新恢复、最后一步进入 FEEDBACK、满意后成功上传 final drink 并刷新恢复 COMPLETED、V2 adjustment 重新 Mixing、regenerate 失败恢复、Mixing 409 恢复、final drink 上传失败后跳过、偏好保存响应丢失后的 requestId 重放；`pnpm test` 70 files / 428 passed / 1 skipped；`pnpm typecheck` 通过；空 SQLite `pnpm db:migrate` 连续两次通过；本轮修改文件 targeted Prettier 通过。
+  - 结果：新增 `tests/e2e/product-pivot.spec.ts` 真实移动 Chromium E2E；Playwright 使用一次运行一套临时绝对路径 SQLite/uploads、显式 fallback、迁移与 seed、固定专用端口、单 worker；修复 E2E 暴露的真实恢复缺陷：Mixing 最后一步成功进入 FEEDBACK 后补拉 adjustment state。
+  - 风险：完整 `pnpm lint` 仍被既有 `components/recipes/recipe-selection-screen.tsx:69` 的 `set-state-in-effect` error 阻塞；完整 `pnpm format:check` 仍被仓库既有换行/格式差异阻塞，且包含本轮文件前的历史文件；`pnpm test:e2e` 运行在移动 Chromium 仿真，不等价于 iOS Simulator/Safari/真机；等待独立 Reviewer。
 
 ## Decision log
 
