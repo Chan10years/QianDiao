@@ -5,9 +5,9 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { FixedActionBar } from "@/components/session/fixed-action-bar";
-import type { RecipeDisplay } from "@/src/domain/recipe";
 import {
   SessionClientError,
+  type RecipeSetSnapshot,
   type SelectRecipeResult,
   type SessionClientLike,
 } from "@/src/infrastructure/http/session-client";
@@ -17,10 +17,7 @@ const SWIPE_THRESHOLD_PX = 72;
 interface RecipeSelectionScreenProps {
   sessionId: string;
   expectedVersion: number;
-  recipeSet: {
-    recommendedRecipeId: string;
-    recipes: readonly RecipeDisplay[];
-  };
+  recipeSet: Pick<RecipeSetSnapshot["recipeSet"], "id" | "recommendedRecipeId" | "recipes">;
   client: SessionClientLike;
   onSelected: (result: SelectRecipeResult) => void;
   onRegenerated: (result: Awaited<ReturnType<SessionClientLike["getRecipeSet"]>>) => void;

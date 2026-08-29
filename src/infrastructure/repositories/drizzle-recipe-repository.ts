@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -639,7 +639,7 @@ export class DrizzleRecipeRepository implements RecipeRepository {
       .select()
       .from(recipeSets)
       .where(eq(recipeSets.sessionId, sessionId))
-      .orderBy(asc(recipeSets.createdAt), asc(recipeSets.id))
+      .orderBy(sql`rowid`)
       .all()
       .map((recipeSet) => ({ recipeSet, recipes: this.listBySet(recipeSet.id) }))
       .filter(({ recipeSet, recipes: recipeRows }) =>

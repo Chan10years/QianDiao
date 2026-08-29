@@ -64,6 +64,65 @@ describe("DrizzleRecipeRepository", () => {
     }
   });
 
+  it("selects the later-inserted active batch when createdAt and UUID ordering disagree", () => {
+    const fixtures = setup();
+    const oldRecipeSetId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    const newRecipeSetId = "00000000-0000-4000-8000-000000000000";
+
+    try {
+      new DrizzleSessionRepository(database.db).create({ id: fixtures.ids.sessionId });
+      const repository = new DrizzleRecipeRepository(database.db);
+
+      const createBatch = (recipeSetId: string, expectedVersion: number) => {
+        const candidates = fixtures.recipes.map((candidate) => ({
+          ...candidate,
+          id: randomUUID(),
+        }));
+        withTransaction(database.db, (transaction) => {
+          new DrizzleRecipeRepository(transaction).createBatch({
+            sessionId: fixtures.ids.sessionId,
+            requestId: randomUUID(),
+            expectedVersion,
+            recipeSetId,
+            sourceMode: "fallback",
+            recipes: candidates.map((candidate) => ({ candidate })),
+            recommendedRecipeId: candidates[0]?.id ?? "",
+            safetyDecisions: candidates.map((candidate) => ({
+              recipeId: candidate.id,
+              level: "ALLOW",
+              ruleHits: [],
+              engineVersion: "1.0.0",
+            })),
+            event: {
+              type: "recipe_set_generated",
+              summary: "测试批次",
+              metadata: {
+                provenance: {
+                  recipeSetId,
+                  sourceMode: "fallback",
+                  degraded: false,
+                  stages: [],
+                },
+                sourceMode: "fallback",
+                degraded: false,
+              },
+            },
+          });
+        });
+      };
+
+      createBatch(oldRecipeSetId, 0);
+      createBatch(newRecipeSetId, 1);
+      database.sqlite
+        .prepare("UPDATE recipe_sets SET created_at = ? WHERE session_id = ?")
+        .run(1234567890000, fixtures.ids.sessionId);
+
+      expect(repository.findSetBySession(fixtures.ids.sessionId)?.id).toBe(newRecipeSetId);
+    } finally {
+      database.cleanup();
+    }
+  });
+
   it("rolls back every write when a transaction fails after intermediate inserts", () => {
     const fixtures = setup();
 
