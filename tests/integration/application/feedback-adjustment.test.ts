@@ -288,6 +288,44 @@ describe("save-feedback application", () => {
     }
   });
 
+  it("completes an accepted feedback carrying a final drink image atomically", async () => {
+    const context = createFeedbackContext();
+
+    try {
+      const result = await saveFeedback(createDependencies(context.database), {
+        sessionId: context.sessionId,
+        requestId: randomUUID(),
+        expectedVersion: 0,
+        recipeId: context.recipeId,
+        feedback: {
+          rating: 5,
+          accepted: true,
+          deltas: { sweetness: 0, acidity: 0, alcoholIntensity: 0, body: 0 },
+          finalImageId: context.finalImageId,
+        },
+      });
+
+      expect(result).toMatchObject({
+        sessionId: context.sessionId,
+        state: "COMPLETED",
+        sessionVersion: 1,
+        feedbackId: expect.any(String),
+        finalImageId: context.finalImageId,
+      });
+      expect(
+        new DrizzleSessionRepository(context.database.db).findById(context.sessionId),
+      ).toMatchObject({
+        state: "COMPLETED",
+        version: 1,
+      });
+      expect(
+        new DrizzleFeedbackRepository(context.database.db).listByRecipe(context.recipeId),
+      ).toHaveLength(1);
+    } finally {
+      context.database.cleanup();
+    }
+  });
+
   it("replays the same save-feedback request without duplicating any record", async () => {
     const context = createFeedbackContext();
     const fixtures = makeDomainFixtures();

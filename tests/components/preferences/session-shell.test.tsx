@@ -53,6 +53,7 @@ describe("SessionShell", () => {
       getRecipeSet: vi.fn(),
       savePreferences: vi.fn().mockResolvedValue(scanSnapshot),
       uploadOverviewImage: vi.fn(),
+      uploadFinalDrinkImage: vi.fn(),
       recognizeIngredients: vi.fn(),
       confirmIngredients: vi.fn(),
       generateRecipeSet: vi.fn(),
@@ -97,6 +98,7 @@ describe("SessionShell", () => {
           new SessionClientError("VERSION_CONFLICT", "会话版本已过期，请重新加载", true),
         ),
       uploadOverviewImage: vi.fn(),
+      uploadFinalDrinkImage: vi.fn(),
       recognizeIngredients: vi.fn(),
       confirmIngredients: vi.fn(),
       generateRecipeSet: vi.fn(),
@@ -128,6 +130,7 @@ describe("SessionShell", () => {
       getRecipeSet: vi.fn(),
       savePreferences: vi.fn(),
       uploadOverviewImage: vi.fn(),
+      uploadFinalDrinkImage: vi.fn(),
       recognizeIngredients: vi.fn(),
       confirmIngredients: vi.fn(),
       generateRecipeSet: vi.fn(),
@@ -196,6 +199,7 @@ describe("SessionShell", () => {
       getRecipeSet: vi.fn(),
       savePreferences: vi.fn(),
       uploadOverviewImage,
+      uploadFinalDrinkImage: vi.fn(),
       recognizeIngredients,
       confirmIngredients: vi.fn(),
       generateRecipeSet: vi.fn(),
@@ -262,6 +266,7 @@ describe("SessionShell", () => {
       getRecipeSet: vi.fn(),
       savePreferences: vi.fn(),
       uploadOverviewImage,
+      uploadFinalDrinkImage: vi.fn(),
       recognizeIngredients: vi
         .fn()
         .mockRejectedValue(

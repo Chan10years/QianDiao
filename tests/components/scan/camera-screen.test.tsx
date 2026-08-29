@@ -50,6 +50,7 @@ function makeClient(overrides: Partial<SessionClientLike> = {}): SessionClientLi
     getRecipeSet: vi.fn(),
     savePreferences: vi.fn(),
     uploadOverviewImage: vi.fn().mockResolvedValue(uploadResult),
+    uploadFinalDrinkImage: vi.fn(),
     recognizeIngredients: vi.fn().mockResolvedValue(recognitionResult),
     confirmIngredients: vi.fn(),
     generateRecipeSet: vi.fn(),

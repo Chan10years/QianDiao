@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AdjustmentScreen } from "@/components/feedback/adjustment-screen";
+import { FinalDrinkPhoto } from "@/components/feedback/final-drink-photo";
 import { SatisfactionScreen } from "@/components/feedback/satisfaction-screen";
 import { IngredientConfirmationScreen } from "@/components/ingredients/ingredient-confirmation-screen";
 import { MixingScreen } from "@/components/mixing/mixing-screen";
@@ -10,6 +11,7 @@ import { PreferencesScreen } from "@/components/preferences/preferences-screen";
 import { RecipeSelectionScreen } from "@/components/recipes/recipe-selection-screen";
 import { CameraScreen } from "@/components/scan/camera-screen";
 import { MobileShell } from "@/components/session/fixed-action-bar";
+import { CompletedScreen } from "@/components/session/completed-screen";
 import { ProgressHeader } from "@/components/session/progress-header";
 import {
   SessionClient,
@@ -81,7 +83,7 @@ export function SessionShell(_props: SessionShellProps) {
           });
         }
 
-        if (nextState === "FEEDBACK" || nextState === "ADJUSTMENT") {
+        if (nextState === "FEEDBACK" || nextState === "ADJUSTMENT" || nextState === "COMPLETED") {
           return client.getAdjustmentState(sessionId).then((adjustmentSnapshot) => {
             if (!active) return;
             setAdjustmentState(adjustmentSnapshot.data);
@@ -121,7 +123,8 @@ export function SessionShell(_props: SessionShellProps) {
         if (
           latestState === "FEEDBACK" ||
           latestState === "ADJUSTMENT" ||
-          latestState === "MIXING"
+          latestState === "MIXING" ||
+          latestState === "COMPLETED"
         ) {
           const latestAdjustmentState = await client.getAdjustmentState(sessionId);
           setAdjustmentState(latestAdjustmentState.data);
@@ -162,6 +165,7 @@ export function SessionShell(_props: SessionShellProps) {
     getAdjustmentState: (id) => client.getAdjustmentState(id),
     savePreferences: (input) => runMutation(() => client.savePreferences(input)),
     uploadOverviewImage: (input) => runMutation(() => client.uploadOverviewImage(input)),
+    uploadFinalDrinkImage: (input) => runMutation(() => client.uploadFinalDrinkImage(input)),
     uploadMixingStepImage: (input) => runMutation(() => client.uploadMixingStepImage(input)),
     recognizeIngredients: (input) => runMutation(() => client.recognizeIngredients(input)),
     confirmIngredients: (input) => runMutation(() => client.confirmIngredients(input)),
@@ -376,13 +380,23 @@ export function SessionShell(_props: SessionShellProps) {
           })()
         ) : snapshot.session.state === "FEEDBACK" ? (
           satisfiedClosing ? (
-            <section className="mobile-surface p-6" aria-label="满意收尾">
-              <div className="mobile-page-header">
-                <p className="mobile-eyebrow">第六步 · 满意收尾</p>
-                <h1>满意收尾</h1>
-                <p>可选成品照拍摄与完成流程将在下一步接入。</p>
-              </div>
-            </section>
+            adjustmentState === null ? (
+              <section role="status" aria-live="polite" className="mobile-surface p-6">
+                正在恢复反馈状态…
+              </section>
+            ) : (
+              <FinalDrinkPhoto
+                sessionId={sessionId}
+                expectedVersion={snapshot.session.version}
+                currentRecipe={adjustmentState.currentRecipe}
+                client={conflictAwareClient}
+                onCompleted={(result) => {
+                  setSnapshot((current) =>
+                    current === null ? current : { ...current, session: result.session },
+                  );
+                }}
+              />
+            )
           ) : adjustmentState === null ? (
             <section role="status" aria-live="polite" className="mobile-surface p-6">
               正在恢复反馈状态…
@@ -446,6 +460,10 @@ export function SessionShell(_props: SessionShellProps) {
               }}
             />
           )
+        ) : snapshot.session.state === "COMPLETED" ? (
+          <CompletedScreen
+            recipe={adjustmentState === null ? null : adjustmentState.currentRecipe}
+          />
         ) : (
           <section className="mobile-surface p-6" role="status">
             <h1 className="text-2xl font-semibold">当前状态：{snapshot.session.state}</h1>

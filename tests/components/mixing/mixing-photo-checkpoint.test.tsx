@@ -19,6 +19,7 @@ function makeClient(): SessionClientLike {
     getRecipeSet: vi.fn(),
     savePreferences: vi.fn(),
     uploadOverviewImage: vi.fn(),
+    uploadFinalDrinkImage: vi.fn(),
     recognizeIngredients: vi.fn(),
     confirmIngredients: vi.fn(),
     generateRecipeSet: vi.fn(),

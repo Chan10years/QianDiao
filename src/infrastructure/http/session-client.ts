@@ -89,6 +89,22 @@ const UploadMixingStepImageResponseSchema = SuccessEnvelopeSchema(
     .strict(),
 );
 
+const UploadFinalDrinkImageResponseSchema = SuccessEnvelopeSchema(
+  z
+    .object({
+      image: z
+        .object({
+          id: z.string().uuid(),
+          role: z.literal("final_drink"),
+          mime: z.literal("image/jpeg"),
+          width: z.number().int().positive(),
+          height: z.number().int().positive(),
+        })
+        .strict(),
+    })
+    .strict(),
+);
+
 const RecognitionResponseSchema = SuccessEnvelopeSchema(
   z.object({ recognition: VisionResultSchema }).strict(),
 );
@@ -292,6 +308,23 @@ export interface UploadMixingStepImageResult {
   session: SessionEnvelope;
 }
 
+export interface UploadFinalDrinkImageInput {
+  sessionId: string;
+  expectedVersion: number;
+  file: File;
+}
+
+export interface UploadFinalDrinkImageResult {
+  image: {
+    id: string;
+    role: "final_drink";
+    mime: "image/jpeg";
+    width: number;
+    height: number;
+  };
+  session: SessionEnvelope;
+}
+
 export interface RecognizeIngredientsInput {
   sessionId: string;
   expectedVersion: number;
@@ -457,6 +490,7 @@ export interface SessionClientLike {
   getAdjustmentState(sessionId: string): Promise<AdjustmentStateSnapshot>;
   savePreferences(input: SavePreferencesInput): Promise<SessionSnapshot>;
   uploadOverviewImage(input: UploadOverviewImageInput): Promise<UploadOverviewImageResult>;
+  uploadFinalDrinkImage(input: UploadFinalDrinkImageInput): Promise<UploadFinalDrinkImageResult>;
   uploadMixingStepImage(input: UploadMixingStepImageInput): Promise<UploadMixingStepImageResult>;
   recognizeIngredients(input: RecognizeIngredientsInput): Promise<RecognitionResult>;
   confirmIngredients(input: ConfirmIngredientsInput): Promise<ConfirmIngredientsResult>;
@@ -483,6 +517,7 @@ export class SessionClientError extends Error {
 type MutationName =
   | "save-preferences"
   | "upload-overview-image"
+  | "upload-final-drink-image"
   | "upload-mixing-step-image"
   | "recognize-ingredients"
   | "confirm-ingredients"
@@ -640,6 +675,33 @@ export class SessionClient {
       UploadMixingStepImageResponseSchema,
     );
     this.pendingRequestIds.delete("upload-mixing-step-image");
+
+    return {
+      image: parsed.data.image,
+      session: parseSessionEnvelope(parsed.session),
+    };
+  }
+
+  async uploadFinalDrinkImage(
+    input: UploadFinalDrinkImageInput,
+  ): Promise<UploadFinalDrinkImageResult> {
+    const requestId = this.requestIdFor("upload-final-drink-image");
+    const form = new FormData();
+    form.set("requestId", requestId);
+    form.set("expectedVersion", String(input.expectedVersion));
+    form.set("role", ImageRoleSchema.parse("final_drink"));
+    form.set("file", input.file, input.file.name);
+
+    const response = await this.fetcher(`/api/sessions/${input.sessionId}/images`, {
+      method: "POST",
+      body: form,
+    });
+    const parsed = await this.parseMutationResponse(
+      "upload-final-drink-image",
+      response,
+      UploadFinalDrinkImageResponseSchema,
+    );
+    this.pendingRequestIds.delete("upload-final-drink-image");
 
     return {
       image: parsed.data.image,

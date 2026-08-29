@@ -124,6 +124,7 @@ function createClient(
     getAdjustmentState: vi.fn().mockResolvedValue(fixture.adjustmentState),
     savePreferences: vi.fn(),
     uploadOverviewImage: vi.fn(),
+    uploadFinalDrinkImage: vi.fn(),
     uploadMixingStepImage: vi.fn(),
     recognizeIngredients: vi.fn(),
     confirmIngredients: vi.fn(),

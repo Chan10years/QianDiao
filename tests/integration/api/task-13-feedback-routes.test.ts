@@ -12,6 +12,7 @@ import {
 } from "@/src/application/unit-of-work";
 import { DrizzleIngredientRepository } from "@/src/infrastructure/repositories/drizzle-ingredient-repository";
 import { DrizzleFeedbackRepository } from "@/src/infrastructure/repositories/drizzle-feedback-repository";
+import { DrizzleImageUploadRepository } from "@/src/infrastructure/repositories/drizzle-image-upload-repository";
 import { DrizzleRecipeRepository } from "@/src/infrastructure/repositories/drizzle-recipe-repository";
 import { DrizzleSessionRepository } from "@/src/infrastructure/repositories/drizzle-session-repository";
 import { RecipeCandidateSchema, type RecipeCandidate } from "@/src/domain/recipe";
@@ -225,6 +226,91 @@ describe("Task 13 feedback routes", () => {
       const completeBody = await completeResponse.json();
       expect(completeResponse.status).toBe(200);
       expect(completeBody.data.state).toBe("COMPLETED");
+    } finally {
+      database.cleanup();
+    }
+  });
+
+  it("completes a satisfied session with a final drink image through the feedback route", async () => {
+    const database = createTestDatabase();
+    const fixtures = makeDomainFixtures();
+    const sessionRepository = new DrizzleSessionRepository(database.db);
+    const recipeRepository = new DrizzleRecipeRepository(database.db);
+    sessionRepository.create({ id: fixtures.ids.sessionId });
+    const recipeSetId = recipeRepository.createRecipeSet({
+      id: randomUUID(),
+      sessionId: fixtures.ids.sessionId,
+      sourceMode: "fallback",
+    });
+    const recipes = fixtures.recipes.map((candidate) =>
+      recipeRepository.createRecipe({
+        recipeSetId,
+        sessionId: fixtures.ids.sessionId,
+        candidate,
+      }),
+    );
+    for (const recipe of recipes) {
+      recipeRepository.createSafetyDecision({
+        recipeId: recipe.id,
+        level: recipe.safetyLevel,
+        ruleHits: [],
+        engineVersion: "1.0.0",
+      });
+    }
+    const selectedRecipe = recipes[0];
+    if (selectedRecipe === undefined) {
+      throw new Error("TEST_SELECTED_RECIPE_MISSING");
+    }
+    new DrizzleIngredientRepository(database.db).replaceForSession({
+      sessionId: fixtures.ids.sessionId,
+      ingredients: [{ ...fixtures.ingredient, confirmed: true, abv: 52 }],
+    });
+    database.sqlite
+      .prepare("UPDATE sessions SET state = 'FEEDBACK', selected_recipe_id = ? WHERE id = ?")
+      .run(selectedRecipe.id, fixtures.ids.sessionId);
+
+    const finalImageId = randomUUID();
+    new DrizzleImageUploadRepository(database.db).createImage({
+      id: finalImageId,
+      sessionId: fixtures.ids.sessionId,
+      role: "final_drink",
+      objectKey: `sessions/${fixtures.ids.sessionId}/final/${finalImageId}.jpg`,
+      mime: "image/jpeg",
+      width: 100,
+      height: 100,
+    });
+
+    try {
+      const response = await createFeedbackRouteHandlers(
+        createFeedbackUnitOfWork(database.db),
+      ).POST(
+        new Request("http://localhost/api/sessions/test/feedback", {
+          method: "POST",
+          body: JSON.stringify({
+            requestId: randomUUID(),
+            expectedVersion: 0,
+            recipeId: selectedRecipe.id,
+            feedback: {
+              rating: 5,
+              accepted: true,
+              deltas: { sweetness: 0, acidity: 0, alcoholIntensity: 0, body: 0 },
+              finalImageId,
+            },
+          }),
+        }),
+        { params: Promise.resolve({ sessionId: fixtures.ids.sessionId }) },
+      );
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.data).toMatchObject({
+        state: "COMPLETED",
+        finalImageId,
+      });
+      expect(body.session).toMatchObject({
+        id: fixtures.ids.sessionId,
+        state: "COMPLETED",
+        version: 1,
+      });
     } finally {
       database.cleanup();
     }

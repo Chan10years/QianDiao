@@ -77,6 +77,7 @@ function createClient(fixture: MixingFixture, advanceMixing: SessionClientLike["
     getRecipeSet: vi.fn().mockResolvedValue(fixture.recipeSet),
     savePreferences: vi.fn(),
     uploadOverviewImage: vi.fn(),
+    uploadFinalDrinkImage: vi.fn(),
     recognizeIngredients: vi.fn(),
     confirmIngredients: vi.fn(),
     generateRecipeSet: vi.fn(),
