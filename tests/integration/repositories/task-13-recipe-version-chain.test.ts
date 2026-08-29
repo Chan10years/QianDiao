@@ -82,8 +82,33 @@ function createVersionedFixture(): VersionedFixture {
   const fixtures = makeDomainFixtures();
   const sessionId = fixtures.ids.sessionId;
   new DrizzleSessionRepository(database.db).create({ id: sessionId });
+  // Task 2 起 getRecipeSet 在读取时复用 deterministic re-ranking（含 candidate-set 校验）：
+  // fixtures 默认三卡同质会触发 DUPLICATE_CANDIDATE。此处沿用
+  // get-recipe-set-ranking.test.ts 的可区分候选与偏好 {4,4,3,4}，使 B 确定性排名第一。
+  database.sqlite
+    .prepare("UPDATE sessions SET preferences_json = ? WHERE id = ?")
+    .run(
+      JSON.stringify({ sweetness: 4, acidity: 4, alcoholIntensity: 3, body: 4 }),
+      sessionId,
+    );
   const repository = new DrizzleRecipeRepository(database.db);
-  const initialRecipes = createInitialSet(repository, sessionId, fixtures.recipes);
+  const [baseA, baseB, baseC] = fixtures.recipes;
+  if (baseA === undefined || baseB === undefined || baseC === undefined) {
+    throw new Error("TEST_FIXTURE_INVALID");
+  }
+  const distinguishableCandidates = [
+    baseA,
+    {
+      ...baseB,
+      materials: [{ name: "白酒", amountMl: 45, unit: "ml" as const }],
+      steps: [{ order: 1, instruction: "先降温再分次加入白酒", isPhotoCheckpoint: false }],
+    },
+    {
+      ...baseC,
+      steps: [{ order: 1, instruction: "加入柠檬片并轻轻搅拌", isPhotoCheckpoint: false }],
+    },
+  ];
+  const initialRecipes = createInitialSet(repository, sessionId, distinguishableCandidates);
   const initialRecipe = initialRecipes[0];
   if (initialRecipe === undefined) {
     throw new Error("TEST_FIXTURE_INVALID");
@@ -284,9 +309,15 @@ describe("Task 13 recipe version chain repository", () => {
 
     try {
       const initialRecipes = context.repository.findInitialRecipeSetBySession(context.sessionId);
+      // recommendedRecipeId 必须等于 deterministic ranking 的第一名（B），否则 GET 抛
+      // RECIPE_SET_INVARIANT；A 仍作为版本链 parent 使用，与推荐解耦。
+      const recommendedRecipe = initialRecipes[1];
+      if (recommendedRecipe === undefined) {
+        throw new Error("TEST_FIXTURE_INVALID");
+      }
       context.repository.setRecommendedRecipe(
         context.initialRecipe.recipeSetId,
-        context.initialRecipe.id,
+        recommendedRecipe.id,
       );
       for (const recipe of initialRecipes) {
         context.database.sqlite
