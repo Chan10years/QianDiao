@@ -221,10 +221,10 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 先写 RED 组件和恢复测试，锁定旧 checkpoint 不再是 UI 前置条件。
-- [ ] 运行定向测试确认 RED。
-- [ ] 实现最小 Stepper 和错误恢复。
-- [ ] 运行组件、应用、API 和全量门禁。
+- [x] 先写 RED 组件和恢复测试，锁定旧 checkpoint 不再是 UI 前置条件。
+- [x] 运行定向测试确认 RED。
+- [x] 实现最小 Stepper 和错误恢复。
+- [x] 运行组件、应用、API 和全量门禁。
 - [ ] 提交后由 Claude Code 独立 Review。
 
 **Acceptance:** 用户可看到清晰纵向步骤、当前内容和前后动作；refresh 保持 currentStep；任何 Mixing 步骤都不要求过程照；旧数据库/migration 完整保留。
@@ -256,11 +256,11 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 先补 RED 组件和集成测试，覆盖满意优先与 Vn+1 绑定。
-- [ ] 运行定向测试确认 RED。
-- [ ] 实现 UI adapter，复用既有后端和错误/幂等恢复。
-- [ ] 运行定向测试、全量 Vitest 和质量门禁。
-- [ ] 提交并等待独立 Review。
+- [x] 先补 RED 组件和集成测试，覆盖满意优先与 Vn+1 绑定。
+- [x] 运行定向测试确认 RED。
+- [x] 实现 UI adapter，复用既有后端和错误/幂等恢复。
+- [x] 运行定向测试、全量 Vitest 和质量门禁。
+- [ ] 提交后等待独立 Review。
 
 **Acceptance:** 满意只进入客户端 satisfied-closing phase，不保存 `accepted=true`、不调用 `completeSession`、不推进 `COMPLETED`；不满意才出现四维调整并保存 `accepted=false`；Vn+1 只针对当前实际配方生成并经既有 Safety；接受后回到 MIXING；不能通过 UI 绕过状态机或 BLOCK。
 
@@ -290,10 +290,10 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 先写 RED 组件/集成测试，覆盖拍照、跳过、失败恢复和 Completed。
-- [ ] 运行定向测试确认 RED。
-- [ ] 实现最小 final drink UI 和完成页面。
-- [ ] 运行全量测试、质量门禁和真实浏览器两条满意路径。
+- [x] 先写 RED 组件/集成测试，覆盖拍照、跳过、失败恢复和 Completed。
+- [x] 运行定向测试确认 RED。
+- [x] 实现最小 final drink UI 和完成页面。
+- [x] 运行全量测试、质量门禁和真实浏览器两条满意路径。
 - [ ] 提交后由 Claude Code 独立 Review。
 
 **Acceptance:** 用户满意后由 Task 6 接手 satisfied-closing，可拍或跳过 final drink；在拍摄/跳过之后才保存 `accepted=true` 与 `finalImageId(uuid|null)`，再调用 `completeSession`；上传失败仍有跳过出口；两条路径都合法进入 `COMPLETED`；没有 `FINAL_PHOTO` 状态或分享入口。
@@ -439,6 +439,19 @@ YYYY-MM-DD | Task N | commit <sha>
   - 修复方案（用户已定，方案 B）：`get-recipe-set` 在读取时复用同一个 `rankRecommendation` deterministic 逻辑重算完整 ranking（输入 session.preferences、recipes、confirmed ingredients 均来自既有持久化数据），GET 直接返回完整 ranked 顺序；不改 DB schema、不加 migration、不加 `rankingPosition` 字段、不产生任何 Provider/LLM 调用。`recommendedRecipeId` 保留用于推荐标识与兼容现有合同；前端删除补偿性提位逻辑，直接消费服务端顺序。
   - 验证：新增全链路回归 `tests/integration/repositories/get-recipe-set-ranking.test.ts`（证明偏好产生 `[B,C,A]`、Repository 实际读取仍为 A/B/C、GET 重算后返回 `[B,C,A]`）；组件测试 fixture 改为真实服务端顺序 `[B,C,A]`，断言首张 B → 左滑 C → 再左滑 A；保留单卡、左滑零 client mutation、当前卡 accept、WARN confirmation、reject-all 不 regenerate 回归。定向测试：`get-recipe-set-ranking.test.ts` + `recipe-selection-screen.test.tsx` 8 passed、`rank-recommendation.test.ts` + `generate-recipe-set.test.ts` 34 passed。Hackathon Sprint Mode 下未运行全量门禁。
   - 风险：Reviewer re-review pending；全量门禁待统一执行；“换一批”仍为禁用占位（Task 3）。
+- 2026-08-29 | Baseline 复核 | 确认 origin/main 88fb8f2 已完整包含于本地 main d89b9db（commit `831b53d` 合并、`4d9d060` 快照、`d89b9db` 修复），Task 1/1R、mobile fixes、Task 2、Task 3 冻结逻辑零改动；从 main 新建冲刺分支 `codex/task-4-6-sprint`。
+- 2026-08-29 | Task 4 | Mixing Stepper | commit 29c0ecb（independent Review pending）
+  - 验证：`mixing-screen.test.tsx` 定向测试通过（RED→GREEN）；`pnpm typecheck` 通过；真实浏览器 402×874 验证 FEEDBACK 前进链路（drive 脚本 advanceMixing 循环推进至 FEEDBACK）。Hackathon Sprint Mode 下未运行全量门禁。
+  - 结果：纵向 Step Index/Stepper 显示当前/已完成/待完成，复用既有 `advanceMixing` API（requestId/expectedVersion/409 恢复），第一步不可后退、最后一步进入 FEEDBACK；refresh 由服务端 currentStep 恢复；渲染路径不再出现 checkpoint photo 入口；旧 `mixing_step` 数据、route、migration 全部保留。
+  - 风险：独立 Reviewer 尚未审查；全量门禁待统一执行。
+- 2026-08-29 | Task 5 | Satisfaction-first Feedback | commit d8596fd（independent Review pending）
+  - 验证：`satisfaction-screen.test.tsx`、`adjustment-screen.test.tsx`、`feedback-adjustment.test.ts` 定向测试通过（RED→GREEN）；`pnpm typecheck` 通过。Hackathon Sprint Mode 下未运行全量门禁。
+  - 结果：FEEDBACK 首屏仅"满意吗？"二选一；"满意"只进入客户端 satisfied-closing phase（零 API 调用、不保存 accepted=true）；"还想调整"展示四维 -2..+2 相对调整与可选备注，调用既有 `saveFeedback(accepted=false)` → ADJUSTMENT → 生成唯一 Vn+1 proposal → 接受后 currentStep 重置回 MIXING；复用 Task 13A/13B 全部后端合同与 409 恢复。
+  - 风险：独立 Reviewer 尚未审查；全量门禁待统一执行。
+- 2026-08-29 | Task 6 | Final Drink / Completed | commit 09fc159（independent Review pending）
+  - 验证：`final-drink-photo.test.tsx`、`completed-screen.test.tsx` 定向测试通过；`feedback-adjustment.test.ts` 新增带 finalImageId 原子完成集成测试；`task-13-feedback-routes.test.ts` 新增 API 路径完成测试；`pnpm typecheck`、修改文件 targeted Prettier 通过。真实浏览器 402×874（fallback Provider + 隔离数据）验证两条满意路径：A 拍照上传并完成（version 8→10，COMPLETED）、B 跳过直接完成（version 8→9，COMPLETED）；路径 A 完成后 reload 恢复到"调饮完成"页面且无任何 mutation 调用。Hackathon Sprint Mode 下未运行全量门禁。
+  - 结果：FinalDrinkPhoto 接手 satisfied-closing——可选 final drink 拍摄/预览/替换/上传（失败保留重试与跳过出口），拍摄或跳过后调用 `saveFeedback(accepted=true, finalImageId=uuid|null)` 原子完成会话；CompletedScreen 展示最终配方 Vn、安全结论与材料清单，完成状态恢复为只读。
+  - 风险：独立 Reviewer 尚未审查；全量门禁待统一执行。
 
 ## Decision log
 
@@ -483,3 +496,9 @@ YYYY-MM-DD | 决策标题
   - 选择：继续使用 `POST /api/sessions/{sessionId}/recipes`；按 session state 区分首次生成与 regenerate，成功写入新的三卡 set，GET/Repository 读取最新 active batch。
   - 替代方案：新增 `/recipes/regenerate` route/use case；本轮不采用以避免复制既有 Provider、安全、租约和幂等管线。
   - 后果：旧 batch 保留在数据库；新 batch 事务提交前旧 batch 可恢复，失败不改变会话状态。
+
+- 2026-08-29 | 满意路径复用 saveFeedback(accepted=true) 原子完成，不单独调用 completeSession
+  - 背景：Task 6 原计划"拍摄/跳过后 saveFeedback(accepted=true) 再调用 completeSession"，但调查发现继承的 Task 13B 后端已定义 `saveFeedback` 在 `accepted=true` 时发出 `COMPLETE_SESSION` 事件（`save-feedback.ts` → `session-machine.ts` FEEDBACK + COMPLETE_SESSION → COMPLETED），并在同一事务内写入 feedback + 状态转换。
+  - 选择：前端满意收尾（拍照或跳过）只调用一次 `saveFeedback(accepted=true, finalImageId=uuid|null)`，由既有用例原子完成会话；不新增前端→`/complete` 的第二次调用。`completeSession` 用例与 `/complete` route 继续保留，用于已落库 accepted=true feedback 的兼容完成路径（Task 13B 合同不破坏）。
+  - 替代方案：前端串联 upload → saveFeedback → completeSession 三次调用；不采用，原因：跨请求非原子（第二步成功、第三步 409 时会话停在 FEEDBACK 且 feedback 已落库，需要额外恢复语义），且重复实现后端已有的状态转换。
+  - 后果：满意完成只需一次状态变更（version +1），幂等与 409 恢复复用 saveFeedback 既有合同；集成测试 `feedback-adjustment.test.ts` 与 `task-13-feedback-routes.test.ts` 均断言带 finalImageId 的 accepted=true 反馈单次调用即返回 COMPLETED。

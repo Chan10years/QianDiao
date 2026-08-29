@@ -199,10 +199,10 @@ Task 2 必须用组件测试证明：UI 不会把数组重新排序为 A → B �
 
 final drink 是 `FEEDBACK` 收尾阶段的可选图片，图片角色继续使用既有 `final_drink` 语义，不新增 SessionState。
 
-- Task 5 的“满意”只打开客户端 `satisfied-closing` phase；在用户拍摄或跳过之前不保存 `accepted=true`，不调用 `completeSession`，不进入 `COMPLETED`。
+- Task 5 的“满意”只打开客户端 `satisfied-closing` phase；在用户拍摄或跳过之前不保存 `accepted=true`，不触发会话完成，不进入 `COMPLETED`。
 - Task 6 接手 `satisfied-closing` phase，邀请用户拍摄 final drink；用户可以拍摄，也可以明确点击跳过。
-- 用户完成拍摄或明确跳过后，保存 `accepted=true` 与 `finalImageId`（拍摄成功为 UUID，跳过为 `null`），再调用 `completeSession` 进入 `COMPLETED`。
-- 上传失败时显示可重试和“跳过 final drink”；跳过仍会完成上述满意 Feedback/complete 顺序，不阻止 `COMPLETED`。
+- 用户完成拍摄或明确跳过后，保存 `accepted=true` 与 `finalImageId`（拍摄成功为 UUID，跳过为 `null`）。继承的 `saveFeedback` 用例在 `accepted=true` 时于同一事务内发出 `COMPLETE_SESSION` 事件并进入 `COMPLETED`（见 `save-feedback.ts` 与 `session-machine.ts`），因此单次 `saveFeedback` 调用即原子完成会话，前端不再单独调用 `completeSession`。
+- 上传失败时显示可重试和“跳过 final drink”；跳过仍走同一单次满意 Feedback 完成路径，不阻止 `COMPLETED`。
 - 不满意路径也可以按继承后端允许的方式保存可选 final image，但它不是进入调整的前置条件。
 - final drink 只作为实验上下文，不用于自动判定质量、医学结论或 Safety override。
 
@@ -224,7 +224,7 @@ ADJUSTMENT → MIXING        （接受 Vn+1）
 - `RECIPE_SELECTION` 包含当前 Recipe Set 和单卡 deck；左滑是客户端动作，换一批是用户主动触发的后端动作。
 - 右滑成功后才设置 `selectedRecipeId` 并进入 `MIXING`。
 - `MIXING` 的 `currentStep` 是可恢复的服务端事实；完成最后一步后可置空并进入 `FEEDBACK`。
-- `FEEDBACK` 中选择满意只进入客户端 `satisfied-closing` phase，session 仍保持 `FEEDBACK`；完成拍摄或跳过后才保存 `accepted=true` 与可选 final image，调用 `completeSession` 进入 `COMPLETED`。选择还想调整则保存 `accepted=false` 后进入 `ADJUSTMENT`。
+- `FEEDBACK` 中选择满意只进入客户端 `satisfied-closing` phase，session 仍保持 `FEEDBACK`；完成拍摄或跳过后才保存 `accepted=true` 与可选 final image，由 `saveFeedback` 在同一事务内原子转换到 `COMPLETED`。选择还想调整则保存 `accepted=false` 后进入 `ADJUSTMENT`。
 - `ADJUSTMENT` 的 proposal 与 current recipe 必须分开读取；接受 proposal 才更新当前配方并重置步骤。
 - 不新增 `FINAL_PHOTO` SessionState。final drink 是可选图片和反馈字段，不是独立状态。
 - 旧 checkpoint image 数据不改变状态语义，新 UI 不以它作为 MIXING 完成条件。
@@ -271,8 +271,8 @@ ADJUSTMENT → MIXING        （接受 Vn+1）
 7. 换一批失败时不丢失当前会话，不自动无限重试，用户可以安全重试。
 8. Mixing 以纵向 Stepper 展示当前步骤；前进、后退和刷新都保留 `currentStep`，不要求 checkpoint photo。
 9. 完成调制后首先出现“满意吗？”，满意分支不会先强迫填写四维反馈。
-10. 选择“满意”只进入客户端 `satisfied-closing` phase；在 final drink 选择前不保存 `accepted=true`、不调用 `completeSession`、不进入 `COMPLETED`。
-11. satisfied-closing phase 中 final drink 可以成功拍摄，也可以跳过；之后才保存 `accepted=true` 与 `finalImageId`（UUID 或 `null`），调用 `completeSession`，两条路径都进入 `COMPLETED`。
+10. 选择“满意”只进入客户端 `satisfied-closing` phase；在 final drink 选择前不保存 `accepted=true`、不触发会话完成、不进入 `COMPLETED`。
+11. satisfied-closing phase 中 final drink 可以成功拍摄，也可以跳过；之后才保存 `accepted=true` 与 `finalImageId`（UUID 或 `null`），单次 `saveFeedback` 原子完成，两条路径都进入 `COMPLETED`。
 12. final drink 上传失败时仍能通过跳过进入 `COMPLETED`，且不破坏满意 Feedback。
 13. 选择“还想调整”后才出现甜度、酸度、酒感、浓郁度相对调整和可选备注；后端可生成一个 Vn+1。
 14. 用户接受 Vn+1 后重新进入 `MIXING`，版本链保持父配方、反馈和 Safety 审计关联，并可再次回到满意判断。
@@ -290,3 +290,5 @@ ADJUSTMENT → MIXING        （接受 Vn+1）
 - 当前 SessionShell 对 `FEEDBACK`、`ADJUSTMENT` 和 `COMPLETED` 仍显示占位状态；新版 Satisfaction-first、Vn+1 和 final drink UI 尚未实现。
 - 仓库当前没有可执行 Playwright E2E；`pnpm test:e2e` 的已知结果为 `No tests found`。Task 7 必须建立真实闭环 E2E，建立后 E2E 成为阻塞发布门禁。
 - 真实 Qwen Provider、真实手机相机和最终手机演示尚未在本 Product Pivot 中验证，留到 Task 8。
+
+**解决状态（2026-08-29，冲刺分支 `codex/task-4-6-sprint`）：** 以上缺口中，单卡 Swipe（Task 2）、换一批 regenerate（Task 3）、Mixing Stepper 移除 checkpoint 主路径（Task 4）、Satisfaction-first / Vn+1 UI（Task 5）、final drink 与 Completed UI（Task 6）已在冲刺分支实现并通过定向测试与真实浏览器验证（commit 29c0ecb / d8596fd / 09fc159），等待独立 Review 与全量门禁统一执行。Playwright E2E（Task 7）与真实 Provider / 真机演示（Task 8）仍未实现。
