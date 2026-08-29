@@ -25,6 +25,10 @@ function makeClient(): SessionClientLike {
     selectRecipe: vi.fn(),
     advanceMixing: vi.fn(),
     uploadMixingStepImage: vi.fn(),
+    getAdjustmentState: vi.fn(),
+    saveFeedback: vi.fn(),
+    generateAdjustment: vi.fn(),
+    acceptAdjustment: vi.fn(),
   };
 }
 
@@ -213,7 +217,10 @@ describe("legacy mixing photo checkpoint panel", () => {
     render(<Harness />);
 
     const persistedPhoto = screen.getByAltText("已保存的关键步骤照片");
-    expect(persistedPhoto).toHaveAttribute("src", `/api/sessions/${sessionId}/images/${imageId}?v=2`);
+    expect(persistedPhoto).toHaveAttribute(
+      "src",
+      `/api/sessions/${sessionId}/images/${imageId}?v=2`,
+    );
 
     await user.click(screen.getByRole("button", { name: "替换照片" }));
     await user.upload(

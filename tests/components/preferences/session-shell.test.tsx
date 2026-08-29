@@ -59,6 +59,10 @@ describe("SessionShell", () => {
       selectRecipe: vi.fn(),
       advanceMixing: vi.fn(),
       uploadMixingStepImage: vi.fn(),
+      getAdjustmentState: vi.fn(),
+      saveFeedback: vi.fn(),
+      generateAdjustment: vi.fn(),
+      acceptAdjustment: vi.fn(),
     };
 
     render(<SessionShell sessionId={preferencesSnapshot.session.id} client={client} />);
@@ -99,6 +103,10 @@ describe("SessionShell", () => {
       selectRecipe: vi.fn(),
       advanceMixing: vi.fn(),
       uploadMixingStepImage: vi.fn(),
+      getAdjustmentState: vi.fn(),
+      saveFeedback: vi.fn(),
+      generateAdjustment: vi.fn(),
+      acceptAdjustment: vi.fn(),
     };
 
     render(<SessionShell sessionId={preferencesSnapshot.session.id} client={client} />);
@@ -126,6 +134,10 @@ describe("SessionShell", () => {
       selectRecipe: vi.fn(),
       advanceMixing: vi.fn(),
       uploadMixingStepImage: vi.fn(),
+      getAdjustmentState: vi.fn(),
+      saveFeedback: vi.fn(),
+      generateAdjustment: vi.fn(),
+      acceptAdjustment: vi.fn(),
     };
 
     render(<SessionShell sessionId={confirmSnapshot.session.id} client={client} />);
@@ -190,6 +202,10 @@ describe("SessionShell", () => {
       selectRecipe: vi.fn(),
       advanceMixing: vi.fn(),
       uploadMixingStepImage: vi.fn(),
+      getAdjustmentState: vi.fn(),
+      saveFeedback: vi.fn(),
+      generateAdjustment: vi.fn(),
+      acceptAdjustment: vi.fn(),
     };
 
     render(<SessionShell sessionId={scanSnapshot.session.id} client={client} />);
@@ -256,6 +272,10 @@ describe("SessionShell", () => {
       selectRecipe: vi.fn(),
       advanceMixing: vi.fn(),
       uploadMixingStepImage: vi.fn(),
+      getAdjustmentState: vi.fn(),
+      saveFeedback: vi.fn(),
+      generateAdjustment: vi.fn(),
+      acceptAdjustment: vi.fn(),
     };
 
     render(<SessionShell sessionId={scanSnapshot.session.id} client={client} />);

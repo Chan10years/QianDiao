@@ -1,12 +1,15 @@
 import { z } from "zod";
 
 import { SuccessEnvelopeSchema } from "@/src/domain/api";
+import { FeedbackSchema, type Feedback } from "@/src/domain/feedback";
 import { DetectedIngredientSchema, type DetectedIngredient } from "@/src/domain/ingredient";
 import {
   RecipeCandidateSchema,
   RecipeDisplaySchema,
+  RecipeSafetySummarySchema,
   type RecipeCandidate,
   type RecipeDisplay,
+  type RecipeSafetySummary,
 } from "@/src/domain/recipe";
 import { ImageRoleSchema } from "@/src/providers/image-store";
 import { VisionResultSchema, type VisionResult } from "@/src/providers/vision-provider";
@@ -141,6 +144,66 @@ const AdvanceMixingResponseSchema = SuccessEnvelopeSchema(
       action: MixingActionSchema,
       currentStep: z.number().int().nonnegative().nullable(),
       totalSteps: z.number().int().positive(),
+    })
+    .strict(),
+);
+
+export const VersionedRecipeReadModelSchema = z
+  .object({
+    recipeId: z.string().uuid(),
+    recipeSetId: z.string().uuid(),
+    candidate: RecipeCandidateSchema,
+    version: z.number().int().positive(),
+    parentRecipeId: z.string().uuid().nullable(),
+    feedbackId: z.string().uuid().nullable(),
+    safety: RecipeSafetySummarySchema,
+    isSelected: z.boolean(),
+  })
+  .strict();
+
+const AdjustmentStateResponseSchema = SuccessEnvelopeSchema(
+  z
+    .object({
+      currentRecipe: VersionedRecipeReadModelSchema,
+      proposal: VersionedRecipeReadModelSchema.nullable(),
+      pendingFeedbackId: z.string().uuid().nullable(),
+    })
+    .strict(),
+);
+
+const SaveFeedbackResponseSchema = SuccessEnvelopeSchema(
+  z
+    .object({
+      sessionId: z.string().uuid(),
+      state: z.enum(["ADJUSTMENT", "COMPLETED"]),
+      sessionVersion: z.number().int().nonnegative(),
+      feedbackId: z.string().uuid(),
+      finalImageId: z.string().uuid().nullable(),
+    })
+    .strict(),
+);
+
+const GenerateAdjustmentResponseSchema = SuccessEnvelopeSchema(
+  z
+    .object({
+      sessionId: z.string().uuid(),
+      state: z.literal("ADJUSTMENT"),
+      sessionVersion: z.number().int().nonnegative(),
+      currentRecipeId: z.string().uuid(),
+      proposedRecipe: VersionedRecipeReadModelSchema,
+      constraints: z.unknown(),
+      safety: RecipeSafetySummarySchema,
+    })
+    .strict(),
+);
+
+const AcceptAdjustmentResponseSchema = SuccessEnvelopeSchema(
+  z
+    .object({
+      sessionId: z.string().uuid(),
+      state: z.literal("MIXING"),
+      sessionVersion: z.number().int().nonnegative(),
+      currentRecipeId: z.string().uuid(),
     })
     .strict(),
 );
@@ -309,6 +372,72 @@ export interface AdvanceMixingResult {
   session: SessionEnvelope;
 }
 
+export interface VersionedRecipeReadModel {
+  recipeId: string;
+  recipeSetId: string;
+  candidate: RecipeCandidate;
+  version: number;
+  parentRecipeId: string | null;
+  feedbackId: string | null;
+  safety: RecipeSafetySummary;
+  isSelected: boolean;
+}
+
+export interface AdjustmentStateSnapshot {
+  data: {
+    currentRecipe: VersionedRecipeReadModel;
+    proposal: VersionedRecipeReadModel | null;
+    pendingFeedbackId: string | null;
+  };
+  session: SessionEnvelope;
+}
+
+export interface SaveFeedbackInput {
+  sessionId: string;
+  expectedVersion: number;
+  recipeId: string;
+  feedback: Feedback;
+}
+
+export interface SaveFeedbackResult {
+  sessionId: string;
+  state: "ADJUSTMENT" | "COMPLETED";
+  sessionVersion: number;
+  feedbackId: string;
+  finalImageId: string | null;
+  session: SessionEnvelope;
+}
+
+export interface GenerateAdjustmentInput {
+  sessionId: string;
+  expectedVersion: number;
+  feedbackId: string;
+}
+
+export interface GenerateAdjustmentResult {
+  sessionId: string;
+  state: "ADJUSTMENT";
+  sessionVersion: number;
+  currentRecipeId: string;
+  proposedRecipe: VersionedRecipeReadModel;
+  safety: RecipeSafetySummary;
+  session: SessionEnvelope;
+}
+
+export interface AcceptAdjustmentInput {
+  sessionId: string;
+  expectedVersion: number;
+  proposedRecipeId: string;
+}
+
+export interface AcceptAdjustmentResult {
+  sessionId: string;
+  state: "MIXING";
+  sessionVersion: number;
+  currentRecipeId: string;
+  session: SessionEnvelope;
+}
+
 export interface SessionClientOptions {
   fetcher?: typeof fetch;
   requestIdFactory?: () => string;
@@ -325,6 +454,7 @@ export function sessionImageUrl(
 export interface SessionClientLike {
   getSession(sessionId: string): Promise<SessionSnapshot>;
   getRecipeSet(sessionId: string): Promise<RecipeSetSnapshot>;
+  getAdjustmentState(sessionId: string): Promise<AdjustmentStateSnapshot>;
   savePreferences(input: SavePreferencesInput): Promise<SessionSnapshot>;
   uploadOverviewImage(input: UploadOverviewImageInput): Promise<UploadOverviewImageResult>;
   uploadMixingStepImage(input: UploadMixingStepImageInput): Promise<UploadMixingStepImageResult>;
@@ -333,6 +463,9 @@ export interface SessionClientLike {
   generateRecipeSet(input: GenerateRecipeSetInput): Promise<GenerateRecipeSetResult>;
   selectRecipe(input: SelectRecipeInput): Promise<SelectRecipeResult>;
   advanceMixing(input: AdvanceMixingInput): Promise<AdvanceMixingResult>;
+  saveFeedback(input: SaveFeedbackInput): Promise<SaveFeedbackResult>;
+  generateAdjustment(input: GenerateAdjustmentInput): Promise<GenerateAdjustmentResult>;
+  acceptAdjustment(input: AcceptAdjustmentInput): Promise<AcceptAdjustmentResult>;
 }
 
 export class SessionClientError extends Error {
@@ -355,7 +488,10 @@ type MutationName =
   | "confirm-ingredients"
   | "generate-recipe-set"
   | "select-recipe"
-  | "advance-mixing";
+  | "advance-mixing"
+  | "save-feedback"
+  | "generate-adjustment"
+  | "accept-adjustment";
 
 export function createRequestId(): string {
   const cryptoApi = globalThis.crypto;
@@ -370,9 +506,7 @@ export function createRequestId(): string {
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
 
-  const hex = Array.from(bytes, (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
   return [
     hex.slice(0, 8),
@@ -409,6 +543,18 @@ export class SessionClient {
     const parsed = await parseResponse(response, RecipeSetSnapshotResponseSchema);
     return {
       recipeSet: parsed.data.recipeSet,
+      session: parseSessionEnvelope(parsed.session),
+    };
+  }
+
+  async getAdjustmentState(sessionId: string): Promise<AdjustmentStateSnapshot> {
+    const response = await this.fetcher(`/api/sessions/${sessionId}/adjustments`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const parsed = await parseResponse(response, AdjustmentStateResponseSchema);
+    return {
+      data: parsed.data,
       session: parseSessionEnvelope(parsed.session),
     };
   }
@@ -613,6 +759,81 @@ export class SessionClient {
       AdvanceMixingResponseSchema,
     );
     this.pendingRequestIds.delete("advance-mixing");
+    return {
+      ...parsed.data,
+      session: parseSessionEnvelope(parsed.session),
+    };
+  }
+
+  async saveFeedback(input: SaveFeedbackInput): Promise<SaveFeedbackResult> {
+    const requestId = this.requestIdFor("save-feedback");
+    const response = await this.fetcher(`/api/sessions/${input.sessionId}/feedback`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        requestId,
+        expectedVersion: input.expectedVersion,
+        recipeId: input.recipeId,
+        feedback: FeedbackSchema.parse(input.feedback),
+      }),
+    });
+    const parsed = await this.parseMutationResponse(
+      "save-feedback",
+      response,
+      SaveFeedbackResponseSchema,
+    );
+    this.pendingRequestIds.delete("save-feedback");
+    return {
+      ...parsed.data,
+      session: parseSessionEnvelope(parsed.session),
+    };
+  }
+
+  async generateAdjustment(input: GenerateAdjustmentInput): Promise<GenerateAdjustmentResult> {
+    const requestId = this.requestIdFor("generate-adjustment");
+    const response = await this.fetcher(`/api/sessions/${input.sessionId}/adjustments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        requestId,
+        expectedVersion: input.expectedVersion,
+        feedbackId: input.feedbackId,
+      }),
+    });
+    const parsed = await this.parseMutationResponse(
+      "generate-adjustment",
+      response,
+      GenerateAdjustmentResponseSchema,
+    );
+    this.pendingRequestIds.delete("generate-adjustment");
+    return {
+      sessionId: parsed.data.sessionId,
+      state: parsed.data.state,
+      sessionVersion: parsed.data.sessionVersion,
+      currentRecipeId: parsed.data.currentRecipeId,
+      proposedRecipe: parsed.data.proposedRecipe,
+      safety: parsed.data.safety,
+      session: parseSessionEnvelope(parsed.session),
+    };
+  }
+
+  async acceptAdjustment(input: AcceptAdjustmentInput): Promise<AcceptAdjustmentResult> {
+    const requestId = this.requestIdFor("accept-adjustment");
+    const response = await this.fetcher(`/api/sessions/${input.sessionId}/accept-adjustment`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        requestId,
+        expectedVersion: input.expectedVersion,
+        proposedRecipeId: input.proposedRecipeId,
+      }),
+    });
+    const parsed = await this.parseMutationResponse(
+      "accept-adjustment",
+      response,
+      AcceptAdjustmentResponseSchema,
+    );
+    this.pendingRequestIds.delete("accept-adjustment");
     return {
       ...parsed.data,
       session: parseSessionEnvelope(parsed.session),

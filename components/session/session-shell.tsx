@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { AdjustmentScreen } from "@/components/feedback/adjustment-screen";
+import { SatisfactionScreen } from "@/components/feedback/satisfaction-screen";
 import { IngredientConfirmationScreen } from "@/components/ingredients/ingredient-confirmation-screen";
 import { MixingScreen } from "@/components/mixing/mixing-screen";
 import { PreferencesScreen } from "@/components/preferences/preferences-screen";
@@ -12,6 +14,7 @@ import { ProgressHeader } from "@/components/session/progress-header";
 import {
   SessionClient,
   SessionClientError,
+  type AdjustmentStateSnapshot,
   type RecipeSetSnapshot,
   type SessionClientLike,
   type SessionSnapshot,
@@ -28,6 +31,10 @@ export function SessionShell(_props: SessionShellProps) {
   const client = useMemo(() => providedClient ?? new SessionClient(), [providedClient]);
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(initialSnapshot ?? null);
   const [recipeSet, setRecipeSet] = useState<RecipeSetSnapshot["recipeSet"] | null>(null);
+  const [adjustmentState, setAdjustmentState] = useState<AdjustmentStateSnapshot["data"] | null>(
+    null,
+  );
+  const [satisfiedClosing, setSatisfiedClosing] = useState(false);
   const [isLoading, setIsLoading] = useState(initialSnapshot === undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -44,18 +51,47 @@ export function SessionShell(_props: SessionShellProps) {
         if (!active) return;
         setSnapshot(nextSnapshot);
         setErrorMessage(null);
-        if (
-          nextSnapshot.session.state === "RECIPE_SELECTION" ||
-          nextSnapshot.session.state === "MIXING"
-        ) {
+        const nextState = nextSnapshot.session.state;
+
+        if (nextState === "RECIPE_SELECTION" || nextState === "MIXING") {
           return client.getRecipeSet(sessionId).then((recipeSnapshot) => {
             if (!active) return;
             setRecipeSet(recipeSnapshot.recipeSet);
             setSnapshot((current) =>
               current === null ? current : { ...current, session: recipeSnapshot.session },
             );
+            if (nextState === "MIXING") {
+              // V2+ 当前配方不在初始三卡批次中，需要从调整状态恢复。
+              const inCurrentBatch = recipeSnapshot.recipeSet.recipes.some(
+                (recipe) => recipe.id === nextSnapshot.data.selectedRecipeId,
+              );
+              if (!inCurrentBatch) {
+                return client.getAdjustmentState(sessionId).then((adjustmentSnapshot) => {
+                  if (!active) return;
+                  setAdjustmentState(adjustmentSnapshot.data);
+                  setSnapshot((current) =>
+                    current === null
+                      ? current
+                      : { ...current, session: adjustmentSnapshot.session },
+                  );
+                });
+              }
+            }
+            return undefined;
           });
         }
+
+        if (nextState === "FEEDBACK" || nextState === "ADJUSTMENT") {
+          return client.getAdjustmentState(sessionId).then((adjustmentSnapshot) => {
+            if (!active) return;
+            setAdjustmentState(adjustmentSnapshot.data);
+            setSnapshot((current) =>
+              current === null ? current : { ...current, session: adjustmentSnapshot.session },
+            );
+          });
+        }
+
+        return undefined;
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -77,12 +113,18 @@ export function SessionShell(_props: SessionShellProps) {
       if (error instanceof SessionClientError && error.code === "VERSION_CONFLICT") {
         const latestSnapshot = await client.getSession(sessionId);
         setSnapshot(latestSnapshot);
-        if (
-          latestSnapshot.session.state === "RECIPE_SELECTION" ||
-          latestSnapshot.session.state === "MIXING"
-        ) {
+        const latestState = latestSnapshot.session.state;
+        if (latestState === "RECIPE_SELECTION" || latestState === "MIXING") {
           const latestRecipeSet = await client.getRecipeSet(sessionId);
           setRecipeSet(latestRecipeSet.recipeSet);
+        }
+        if (
+          latestState === "FEEDBACK" ||
+          latestState === "ADJUSTMENT" ||
+          latestState === "MIXING"
+        ) {
+          const latestAdjustmentState = await client.getAdjustmentState(sessionId);
+          setAdjustmentState(latestAdjustmentState.data);
         }
       }
       throw error;
@@ -117,6 +159,7 @@ export function SessionShell(_props: SessionShellProps) {
   const conflictAwareClient: SessionClientLike = {
     getSession: (id) => client.getSession(id),
     getRecipeSet: (id) => client.getRecipeSet(id),
+    getAdjustmentState: (id) => client.getAdjustmentState(id),
     savePreferences: (input) => runMutation(() => client.savePreferences(input)),
     uploadOverviewImage: (input) => runMutation(() => client.uploadOverviewImage(input)),
     uploadMixingStepImage: (input) => runMutation(() => client.uploadMixingStepImage(input)),
@@ -125,6 +168,9 @@ export function SessionShell(_props: SessionShellProps) {
     generateRecipeSet: (input) => runMutation(() => client.generateRecipeSet(input)),
     selectRecipe: (input) => runMutation(() => client.selectRecipe(input)),
     advanceMixing: (input) => runMutation(() => client.advanceMixing(input)),
+    saveFeedback: (input) => runMutation(() => client.saveFeedback(input)),
+    generateAdjustment: (input) => runMutation(() => client.generateAdjustment(input)),
+    acceptAdjustment: (input) => runMutation(() => client.acceptAdjustment(input)),
   };
 
   if (isLoading || snapshot === null) {
@@ -274,41 +320,131 @@ export function SessionShell(_props: SessionShellProps) {
             />
           )
         ) : snapshot.session.state === "MIXING" ? (
-          recipeSet === null ? (
-            <section role="status" aria-live="polite" className="mobile-surface p-6">
-              正在恢复调饮步骤…
-            </section>
-          ) : (
-            (() => {
-              const selectedRecipe = recipeSet.recipes.find(
-                (recipe) => recipe.id === snapshot.data.selectedRecipeId,
-              );
-              return selectedRecipe === undefined ? (
+          (() => {
+            const selectedRecipeId = snapshot.data.selectedRecipeId;
+            const batchRecipe =
+              recipeSet === null
+                ? undefined
+                : recipeSet.recipes.find((recipe) => recipe.id === selectedRecipeId);
+            const adjustedModel =
+              adjustmentState !== null &&
+              adjustmentState.currentRecipe.recipeId === selectedRecipeId
+                ? adjustmentState.currentRecipe
+                : null;
+            const recipe =
+              batchRecipe ??
+              (adjustedModel === null
+                ? null
+                : { ...adjustedModel.candidate, safety: adjustedModel.safety });
+
+            if (recipe === null) {
+              if (isLoading || (recipeSet !== null && adjustmentState === null)) {
+                return (
+                  <section role="status" aria-live="polite" className="mobile-surface p-6">
+                    正在恢复调饮步骤…
+                  </section>
+                );
+              }
+              return (
                 <section role="alert" className="mobile-notice mobile-notice--error">
                   当前选择的配方无法恢复，请重新加载服务端会话。
                 </section>
-              ) : (
-                <MixingScreen
-                  key={`${selectedRecipe.id}:${snapshot.data.currentStep}`}
-                  sessionId={sessionId}
-                  expectedVersion={snapshot.session.version}
-                  currentStep={snapshot.data.currentStep}
-                  recipe={selectedRecipe}
-                  client={conflictAwareClient}
-                  onAdvanced={(result) => {
-                    setSnapshot((current) =>
-                      current === null
-                        ? current
-                        : {
-                            ...current,
-                            data: { ...current.data, currentStep: result.currentStep },
-                            session: result.session,
-                          },
-                    );
-                  }}
-                />
               );
-            })()
+            }
+
+            return (
+              <MixingScreen
+                key={`${recipe.id}:${snapshot.data.currentStep}`}
+                sessionId={sessionId}
+                expectedVersion={snapshot.session.version}
+                currentStep={snapshot.data.currentStep}
+                recipe={recipe}
+                client={conflictAwareClient}
+                onAdvanced={(result) => {
+                  setSnapshot((current) =>
+                    current === null
+                      ? current
+                      : {
+                          ...current,
+                          data: { ...current.data, currentStep: result.currentStep },
+                          session: result.session,
+                        },
+                  );
+                }}
+              />
+            );
+          })()
+        ) : snapshot.session.state === "FEEDBACK" ? (
+          satisfiedClosing ? (
+            <section className="mobile-surface p-6" aria-label="满意收尾">
+              <div className="mobile-page-header">
+                <p className="mobile-eyebrow">第六步 · 满意收尾</p>
+                <h1>满意收尾</h1>
+                <p>可选成品照拍摄与完成流程将在下一步接入。</p>
+              </div>
+            </section>
+          ) : adjustmentState === null ? (
+            <section role="status" aria-live="polite" className="mobile-surface p-6">
+              正在恢复反馈状态…
+            </section>
+          ) : (
+            <SatisfactionScreen
+              sessionId={sessionId}
+              expectedVersion={snapshot.session.version}
+              currentRecipe={adjustmentState.currentRecipe}
+              client={conflictAwareClient}
+              onSatisfied={() => setSatisfiedClosing(true)}
+              onFeedbackSaved={(result) => {
+                setSnapshot((current) =>
+                  current === null ? current : { ...current, session: result.session },
+                );
+                setAdjustmentState({
+                  currentRecipe: adjustmentState.currentRecipe,
+                  proposal: null,
+                  pendingFeedbackId: result.feedbackId,
+                });
+              }}
+            />
+          )
+        ) : snapshot.session.state === "ADJUSTMENT" ? (
+          adjustmentState === null ? (
+            <section role="status" aria-live="polite" className="mobile-surface p-6">
+              正在恢复调整状态…
+            </section>
+          ) : (
+            <AdjustmentScreen
+              sessionId={sessionId}
+              expectedVersion={snapshot.session.version}
+              currentRecipe={adjustmentState.currentRecipe}
+              proposal={adjustmentState.proposal}
+              pendingFeedbackId={adjustmentState.pendingFeedbackId}
+              client={conflictAwareClient}
+              onAccepted={(result, proposal) => {
+                setSnapshot((current) =>
+                  current === null
+                    ? current
+                    : {
+                        ...current,
+                        data: {
+                          ...current.data,
+                          selectedRecipeId: proposal.recipeId,
+                          currentStep: 0,
+                        },
+                        session: result.session,
+                      },
+                );
+                setAdjustmentState((current) =>
+                  current === null
+                    ? current
+                    : {
+                        ...current,
+                        currentRecipe: proposal,
+                        proposal: null,
+                        pendingFeedbackId: null,
+                      },
+                );
+              }}
+            />
           )
         ) : (
           <section className="mobile-surface p-6" role="status">

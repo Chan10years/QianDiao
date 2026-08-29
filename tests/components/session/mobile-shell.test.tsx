@@ -40,6 +40,10 @@ function makeClient(overrides: Partial<SessionClientLike> = {}): SessionClientLi
     selectRecipe: vi.fn(),
     advanceMixing: vi.fn(),
     uploadMixingStepImage: vi.fn(),
+    getAdjustmentState: vi.fn(),
+    saveFeedback: vi.fn(),
+    generateAdjustment: vi.fn(),
+    acceptAdjustment: vi.fn(),
     ...overrides,
   };
 }

@@ -83,6 +83,10 @@ function createClient(fixture: MixingFixture, advanceMixing: SessionClientLike["
     selectRecipe: vi.fn(),
     advanceMixing,
     uploadMixingStepImage: vi.fn(),
+    getAdjustmentState: vi.fn(),
+    saveFeedback: vi.fn(),
+    generateAdjustment: vi.fn(),
+    acceptAdjustment: vi.fn(),
   } as SessionClientLike;
 }
 
@@ -235,7 +239,8 @@ describe("mixing screen", () => {
       session: { id: sessionId, state: "FEEDBACK", version: 4 },
     });
     await waitFor(() => {
-      expect(screen.getByText("当前状态：FEEDBACK")).toBeInTheDocument();
+      // Task 5：最后一步进入 FEEDBACK 后由满意优先反馈接手（恢复 adjustmentState）。
+      expect(screen.getByText("正在恢复反馈状态…")).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "完成最后一步" })).not.toBeInTheDocument();
   });
