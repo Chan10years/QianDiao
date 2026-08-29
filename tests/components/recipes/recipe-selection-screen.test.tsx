@@ -42,24 +42,6 @@ const recipeSet = {
   recommendedRecipeId: "323e4567-e89b-12d3-a456-426614174000",
   recipes: [
     {
-      id: "423e4567-e89b-12d3-a456-426614174000",
-      strategy: "C_UPGRADE",
-      title: "C 升级方案",
-      fitReason: "更适合清爽口味",
-      differenceReason: "通过补充柠檬和冰块提高层次。",
-      materials: [{ name: "白酒", amountMl: 30, unit: "ml" }],
-      steps: [{ order: 1, instruction: "加入冰块并搅拌。" }],
-      estimatedAbv: 20,
-      safetyLevel: "WARN",
-      experimental: true,
-      missingIngredients: ["柠檬"],
-      safety: {
-        level: "WARN",
-        reasons: ["含有实验性组合，请先少量试饮。"],
-        alternatives: ["可改用已确认的果汁。"],
-      },
-    },
-    {
       id: "323e4567-e89b-12d3-a456-426614174000",
       strategy: "B_CREATIVE",
       title: "B 创意方案",
@@ -75,6 +57,24 @@ const recipeSet = {
         level: "ALLOW",
         reasons: ["未命中已知安全规则。"],
         alternatives: [],
+      },
+    },
+    {
+      id: "423e4567-e89b-12d3-a456-426614174000",
+      strategy: "C_UPGRADE",
+      title: "C 升级方案",
+      fitReason: "更适合清爽口味",
+      differenceReason: "通过补充柠檬和冰块提高层次。",
+      materials: [{ name: "白酒", amountMl: 30, unit: "ml" }],
+      steps: [{ order: 1, instruction: "加入冰块并搅拌。" }],
+      estimatedAbv: 20,
+      safetyLevel: "WARN",
+      experimental: true,
+      missingIngredients: ["柠檬"],
+      safety: {
+        level: "WARN",
+        reasons: ["含有实验性组合，请先少量试饮。"],
+        alternatives: ["可改用已确认的果汁。"],
       },
     },
     {
@@ -171,7 +171,7 @@ describe("recipe selection swipe deck", () => {
     expect(screen.getByText("推荐方案")).toBeInTheDocument();
     expect(screen.getByText(/先降温再分次加入，突出香气变化。/)).toBeInTheDocument();
 
-    // 左滑等价操作“不要这杯”只推进本地 deck cursor。
+    // 左滑等价操作“不要这杯”只推进本地 deck cursor：B → C → A。
     await user.click(screen.getByRole("button", { name: "不要这杯" }));
 
     expect(screen.getByRole("heading", { name: "C 升级方案" })).toBeInTheDocument();
@@ -179,6 +179,12 @@ describe("recipe selection swipe deck", () => {
     expect(screen.getByText(/第 2 \/ 3 套/)).toBeInTheDocument();
     expect(client.selectRecipe).not.toHaveBeenCalled();
     expect(client.generateRecipeSet).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "不要这杯" }));
+
+    expect(screen.getByRole("heading", { name: "A 保守方案" })).toBeInTheDocument();
+    expect(screen.getByText(/第 3 \/ 3 套/)).toBeInTheDocument();
+    expect(client.selectRecipe).not.toHaveBeenCalled();
   });
 
   it("ignores small drags and advances to the next card only on a full left swipe", async () => {
@@ -204,7 +210,7 @@ describe("recipe selection swipe deck", () => {
 
   it("accepts the currently displayed recommendation through the click equivalent and calls selectRecipe", async () => {
     const user = userEvent.setup();
-    const recommendedRecipe = recipeSet.recipes[1];
+    const recommendedRecipe = recipeSet.recipes[0];
     const client = createClient({
       getSession: vi.fn().mockResolvedValue(recipeSelectionSnapshot),
       getRecipeSet: vi.fn().mockResolvedValue(recipeSetResponse),
@@ -236,7 +242,7 @@ describe("recipe selection swipe deck", () => {
 
   it("blocks accepting a WARN card until the warning is explicitly acknowledged", async () => {
     const user = userEvent.setup();
-    const warnRecipe = recipeSet.recipes[0];
+    const warnRecipe = recipeSet.recipes[1];
     const client = createClient({
       getSession: vi.fn().mockResolvedValue(recipeSelectionSnapshot),
       getRecipeSet: vi.fn().mockResolvedValue(recipeSetResponse),
@@ -277,11 +283,22 @@ describe("recipe selection swipe deck", () => {
     });
   });
 
-  it("shows the batch refresh entry after all three cards are rejected without regenerating", async () => {
+  it("regenerates only after the user clicks refresh after rejecting all cards", async () => {
     const user = userEvent.setup();
+    const regeneratedResponse = {
+      recipeSet: { ...recipeSet, id: "623e4567-e89b-12d3-a456-426614174000" },
+      session: { id: sessionId, state: "RECIPE_SELECTION" as const, version: 4 },
+    };
     const client = createClient({
       getSession: vi.fn().mockResolvedValue(recipeSelectionSnapshot),
-      getRecipeSet: vi.fn().mockResolvedValue(recipeSetResponse),
+      getRecipeSet: vi
+        .fn()
+        .mockResolvedValueOnce(recipeSetResponse)
+        .mockResolvedValueOnce(regeneratedResponse),
+      generateRecipeSet: vi.fn().mockResolvedValue({
+        recipeSet: regeneratedResponse.recipeSet,
+        session: { id: sessionId, state: "RECIPE_SELECTION", version: 4 },
+      }),
     });
 
     render(<SessionShell sessionId={sessionId} client={client} />);
@@ -292,9 +309,17 @@ describe("recipe selection swipe deck", () => {
     await user.click(screen.getByRole("button", { name: "不要这杯" }));
 
     expect(screen.queryByRole("heading", { name: "A 保守方案" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "换一批" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "换一批" })).toBeEnabled();
     expect(client.selectRecipe).not.toHaveBeenCalled();
     expect(client.generateRecipeSet).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "换一批" }));
+    expect(client.generateRecipeSet).toHaveBeenCalledTimes(1);
+    expect(client.generateRecipeSet).toHaveBeenCalledWith({
+      sessionId,
+      expectedVersion: 3,
+    });
+    expect(await screen.findByRole("heading", { name: "B 创意方案" })).toBeInTheDocument();
   });
 
   it("keeps the swipe deck clickable equivalents alongside the gesture", async () => {
@@ -324,15 +349,7 @@ describe("recipe selection swipe deck", () => {
             alternatives: ["移除该材料后重新生成。"],
           },
         },
-        {
-          ...recipeSet.recipes[1],
-          safetyLevel: "WARN",
-          safety: {
-            level: "WARN",
-            reasons: ["请先确认该 WARN 提示。"],
-            alternatives: ["可改用 A 保守方案。"],
-          },
-        },
+        recipeSet.recipes[1],
         recipeSet.recipes[2],
       ],
     };
@@ -347,17 +364,17 @@ describe("recipe selection swipe deck", () => {
     render(<SessionShell sessionId={sessionId} client={client} />);
 
     expect(await screen.findByRole("heading", { name: "选择一套配方" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "C 升级方案" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "B 创意方案" })).not.toBeInTheDocument();
     expect(screen.getByText("已隐藏 1 个 BLOCK 方案，仅保留审计摘要。")).toBeInTheDocument();
     expect(screen.getByText(/含有不可接受的组合。/)).toBeInTheDocument();
 
-    // 推荐第一名 B 仍排第一，deck 只含 2 张非 BLOCK 卡。
-    expect(screen.getByRole("heading", { name: "B 创意方案" })).toBeInTheDocument();
+    // BLOCK 卡不入 deck，服务端顺序中剩余 [C, A]，C 是首卡且为 WARN。
+    expect(screen.getByRole("heading", { name: "C 升级方案" })).toBeInTheDocument();
     expect(screen.getByText(/第 1 \/ 2 套/)).toBeInTheDocument();
 
     const acceptButton = screen.getByRole("button", { name: "选这杯" });
     expect(acceptButton).toBeDisabled();
-    await user.click(screen.getByRole("checkbox", { name: /确认 B 创意方案.*WARN 提示/ }));
+    await user.click(screen.getByRole("checkbox", { name: /确认 C 升级方案.*WARN 提示/ }));
     expect(acceptButton).toBeEnabled();
   });
 });

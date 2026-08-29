@@ -250,6 +250,12 @@ export function SessionShell(_props: SessionShellProps) {
               expectedVersion={snapshot.session.version}
               recipeSet={recipeSet}
               client={conflictAwareClient}
+              onRegenerated={(result) => {
+                setRecipeSet(result.recipeSet);
+                setSnapshot((current) =>
+                  current === null ? current : { ...current, session: result.session },
+                );
+              }}
               onSelected={(result) => {
                 setSnapshot((current) =>
                   current === null

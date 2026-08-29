@@ -1,7 +1,9 @@
 import { z } from "zod";
 
-import { SessionIdSchema } from "@/src/domain/id";
+import { parseRecipeId, SessionIdSchema } from "@/src/domain/id";
 import { RecipeCandidateSchema, RecipeDisplaySchema } from "@/src/domain/recipe";
+import { rankRecommendation } from "@/src/agent/rank-recommendation";
+import { CandidateSetValidationError } from "@/src/agent/validate-candidate-set";
 import { evaluateRecipeCandidateSafety } from "@/src/application/repair-blocked-recipe";
 import { evaluateSafety } from "@/src/safety/evaluate-safety";
 import type { IngredientRepository } from "@/src/repositories/ingredient-repository";
@@ -125,9 +127,7 @@ export function getRecipeSet(dependencies: GetRecipeSetDependencies, input: GetR
 
   let recipes;
   try {
-    const initialRecipes =
-      repository.findInitialRecipeSetBySession?.(parsed.sessionId) ??
-      repository.listBySet(recipeSet.id);
+    const initialRecipes = repository.listBySet(recipeSet.id);
     if (
       initialRecipes.length === 0 ||
       initialRecipes.some((recipe) => recipe.recipeSetId !== recipeSet.id)
@@ -228,6 +228,48 @@ export function getRecipeSet(dependencies: GetRecipeSetDependencies, input: GetR
     throw new RecipeSetInvariantError();
   }
 
+  // 生成时只持久化了 recommendedRecipeId，Repository 读取按 A/B/C 落库顺序返回；
+  // 此处复用同一个 deterministic ranking 逻辑重算完整顺序，保证 GET 稳定表达 recommendation ranking。
+  let rankedRecipeIds;
+  try {
+    rankedRecipeIds = rankRecommendation({
+      preferences:
+        session.preferences ?? {
+          sweetness: 3,
+          acidity: 3,
+          alcoholIntensity: 3,
+          body: 3,
+        },
+      candidateSet: {
+        recipes,
+        // Repository 记录里只存 string；经既有 domain validation 安全恢复 RecipeId branded type。
+        recommendedRecipeId: parseRecipeId(recipeSet.recommendedRecipeId),
+      },
+      allowedMaterialNames: confirmedIngredients.map((ingredient) => ingredient.canonicalName),
+    }).rankedRecipeIds;
+  } catch (error) {
+    if (error instanceof CandidateSetValidationError || isPersistedDataIntegrityError(error)) {
+      throw new RecipeSetInvariantError();
+    }
+    throw error;
+  }
+  if (
+    rankedRecipeIds.length !== recipes.length ||
+    new Set(rankedRecipeIds).size !== recipes.length ||
+    rankedRecipeIds.some((id) => !recipeIds.has(id)) ||
+    rankedRecipeIds[0] !== recipeSet.recommendedRecipeId
+  ) {
+    throw new RecipeSetInvariantError();
+  }
+  const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+  const orderedRecipes = rankedRecipeIds.map((id) => {
+    const recipe = recipesById.get(id);
+    if (recipe === undefined) {
+      throw new RecipeSetInvariantError();
+    }
+    return recipe;
+  });
+
   let decisionEvents;
   try {
     decisionEvents = repository.listDecisionEvents(parsed.sessionId);
@@ -276,7 +318,7 @@ export function getRecipeSet(dependencies: GetRecipeSetDependencies, input: GetR
         degraded: provenanceResult.data.degraded,
         provenance: provenanceResult.data,
         recommendedRecipeId: recipeSet.recommendedRecipeId,
-        recipes: recipes.map((recipe) => {
+        recipes: orderedRecipes.map((recipe) => {
           const decision = decisionsByRecipeId.get(recipe.id);
           if (decision === undefined) {
             throw new RecipeSetInvariantError();

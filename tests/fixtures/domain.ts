@@ -34,7 +34,7 @@ export function makeDomainFixtures() {
     title: `${strategy} 调饮`,
     fitReason: "适合当前口味偏好",
     differenceReason: `${strategy} 通过手法和比例形成不同体验`,
-    materials: [{ name: "白酒", amountMl: 30, unit: "ml" }],
+    materials: [{ name: "白酒", amountMl: 30, unit: "ml" as const }],
     steps: [{ order: 1, instruction: "加入材料并轻轻搅拌", isPhotoCheckpoint: false }],
     estimatedAbv: 12,
     safetyLevel: "ALLOW" as const,

@@ -35,6 +35,7 @@ export interface RecommendationScore {
 export interface RecommendationResult {
   candidateSet: RecipeCandidateSet;
   scores: readonly RecommendationScore[];
+  rankedRecipeIds: readonly RecipeCandidate["id"][];
 }
 
 function calculateTasteDistance(preferences: TasteProfile, strategy: RecipeStrategy): number {
@@ -111,5 +112,6 @@ export function rankRecommendation(input: {
   return {
     candidateSet: rankedCandidateSet,
     scores,
+    rankedRecipeIds: sortedScores.map((score) => score.recipeId),
   };
 }

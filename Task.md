@@ -142,11 +142,11 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 实现前验证 `generate` response、GET recipe set 和 Repository 持久化读取之间的顺序，确认 recommendation-ranked order 稳定传递；不得重新按 A/B/C 排序。
+- [x] 实现前验证 `generate` response、GET recipe set 和 Repository 持久化读取之间的顺序，确认 recommendation-ranked order 稳定传递；不得重新按 A/B/C 排序。
 - [ ] 如果无法证明 ranking 顺序稳定，先停止 Task 2 UI 实现，在 Decision Log 报告最小稳定暴露方案（例如由服务端持久化或返回显式 ranking position），取得用户最终决定后再写 UI RED 测试。
-- [ ] 从当前 ranking 输出和组件行为写 RED 测试，禁止测试依赖 A/B/C 顺序。
-- [ ] 运行定向组件测试确认 RED。
-- [ ] 实现最小本地 deck cursor、手势/键盘等价操作和右滑选择。
+- [x] 从当前 ranking 输出和组件行为写 RED 测试，禁止测试依赖 A/B/C 顺序。
+- [x] 运行定向组件测试确认 RED。
+- [x] 实现最小本地 deck cursor、手势/键盘等价操作和右滑选择。
 - [ ] 运行组件测试、全量 Vitest 和质量门禁。
 - [ ] 提交并等待独立 Review；不进入 Task 3 直到 PASS。
 
@@ -186,11 +186,11 @@ Task 7 建立真实可执行 Playwright E2E 前，Frozen Baseline 的 `pnpm test
 
 **Steps:**
 
-- [ ] 完成 `generateRecipeSet`、Recipe Repository、route、幂等和 state guard 调查，写出当前不可直接复用点。
-- [ ] 记录方案 A/B 的选择、替代方案和后果；取得用户最终决定。
-- [ ] 先写 RED：三张全拒绝后点击触发、重复请求、版本冲突、Safety-invalid 候选和 Provider 失败。
-- [ ] 运行定向测试确认失败原因对应 regenerate。
-- [ ] 实现最小选定 API，保证外部 Provider 调用不持有长数据库事务。
+- [x] 完成 `generateRecipeSet`、Recipe Repository、route、幂等和 state guard 调查，写出当前不可直接复用点。
+- [x] 记录方案 A/B 的选择、替代方案和后果；取得用户最终决定。
+- [x] 先写 RED：三张全拒绝后点击触发、重复请求、版本冲突、Safety-invalid 候选和 Provider 失败。
+- [x] 运行定向测试确认失败原因对应 regenerate。
+- [x] 实现最小选定 API，保证外部 Provider 调用不持有长数据库事务。
 - [ ] 运行应用/API/组件测试和全量门禁，提交并独立 Review。
 
 **Acceptance:** 三张全拒绝不会自动生成；主动点击才产生一次新的 3-card batch；新批次完成 Zod/Safety/ranking；成功后仍在 RECIPE_SELECTION，直到右滑；失败可重试且不丢当前会话；无新状态、无 migration。
@@ -430,6 +430,15 @@ YYYY-MM-DD | Task N | commit <sha>
   - 浏览器：使用 fallback Provider、隔离 SQLite 和上传目录，在真实 390×844 与 320px viewport 验证 Preferences、Scan、Confirmation；保留真实四维 range、文件上传/识别/替换、材料 category/brand/ABV/confidence/confirmed/add/delete/guard；FixedActionBar 贴底且无水平溢出；reduced-motion media query 生效。
   - 结果：将 Prototype 的 paper/wine/cinnabar/green/gold tokens、Kai/Serif/Mono 字体角色、纸卡、背景装饰、Scan 场景和材料确认视觉整合进既有 Next.js 组件；保留 SessionShell、真实 API、`expectedVersion`、恢复与安全边界。修复 Task 1 Review 的三项旧 finding：Shell 成为 bottom reserve 唯一 owner，error recovery 不再错误保持 `aria-busy=true`，小号 accent text 改用深色语义 alias。
   - 风险：独立 Reviewer 尚未审查；未打包的霞鹜文楷继续依赖系统 fallback；build 保留既有 `UPLOAD_DIR` 动态文件追踪 warning；正式 Playwright E2E 仍由 Task 7 建立。Task 2–6 的业务行为未开始。
+- 2026-08-29 | Task 2 | implementation commit pending independent Review（branch `task-2-recipe-swipe-deck`）
+  - 验证：ranking 稳定性调查结论 STABLE——`rank-recipe-candidates` 输出的推荐第一名以 `recommendedRecipeId` 持久化，Repository 写入/读取保持 recipes 顺序，GET 返回原数组顺序；前端仅按 `recommendedRecipeId` 提位，不重新 sort。定向测试：`recipe-selection-screen.test.tsx` 7 passed（RED 曾 7 failed）、`tests/components/session` 7 passed、`pnpm typecheck` 通过。Hackathon Sprint Mode 下未运行全量 `pnpm test / lint / format:check / build / test:e2e`。
+  - 结果：实现单卡 Swipe Deck——首屏显示 recommendation ranking #1，左滑/“不要这杯”仅推进本地 deck cursor（零 client 调用），右滑/“选这杯”调用现有 `selectRecipe`（复用 requestId/expectedVersion/409 recovery），WARN 未确认禁用选择，BLOCK 卡只展示审计摘要不入 deck，三张全拒绝显示禁用“换一批”入口（Task 2 不实现 regenerate）；移除 RecipeCard 旧 radio 选择，保留点击等价操作与 reduced-motion。
+  - 风险：独立 Reviewer 尚未审查；全量门禁待统一执行；“换一批”按钮当前为禁用占位，真实 regenerate 属 Task 3；`session-shell.tsx` 无需修改。
+- 2026-08-29 | Task 2 | Reviewer Important finding 修复：GET 时 deterministic re-ranking（Reviewer re-review pending，branch `task-2-recipe-swipe-deck`）
+  - Reviewer finding：此前记录的 "ranking STABLE" 结论有误——完整 ranking 在生成时计算但只持久化 `recommendedRecipeId`，Repository GET 恢复 A/B/C 落库顺序，前端按 `recommendedRecipeId` 提位会把正确 `[B,C,A]` 退化成 `[B,A,C]`。
+  - 修复方案（用户已定，方案 B）：`get-recipe-set` 在读取时复用同一个 `rankRecommendation` deterministic 逻辑重算完整 ranking（输入 session.preferences、recipes、confirmed ingredients 均来自既有持久化数据），GET 直接返回完整 ranked 顺序；不改 DB schema、不加 migration、不加 `rankingPosition` 字段、不产生任何 Provider/LLM 调用。`recommendedRecipeId` 保留用于推荐标识与兼容现有合同；前端删除补偿性提位逻辑，直接消费服务端顺序。
+  - 验证：新增全链路回归 `tests/integration/repositories/get-recipe-set-ranking.test.ts`（证明偏好产生 `[B,C,A]`、Repository 实际读取仍为 A/B/C、GET 重算后返回 `[B,C,A]`）；组件测试 fixture 改为真实服务端顺序 `[B,C,A]`，断言首张 B → 左滑 C → 再左滑 A；保留单卡、左滑零 client mutation、当前卡 accept、WARN confirmation、reject-all 不 regenerate 回归。定向测试：`get-recipe-set-ranking.test.ts` + `recipe-selection-screen.test.tsx` 8 passed、`rank-recommendation.test.ts` + `generate-recipe-set.test.ts` 34 passed。Hackathon Sprint Mode 下未运行全量门禁。
+  - 风险：Reviewer re-review pending；全量门禁待统一执行；“换一批”仍为禁用占位（Task 3）。
 
 ## Decision log
 
@@ -468,3 +477,9 @@ YYYY-MM-DD | 决策标题
   - 选择：Task 3 先比较扩展既有 POST 与新增 regenerate Route/use case；在用户决定前不实现任一方案。
   - 替代方案：Codex 直接选择一个 API 方案；不采用。
   - 后果：Task 3 是实现前的明确决策门，不能以 UI 细节绕过后端语义。
+
+- 2026-08-29 | 方案 A：复用既有 recipes POST 进行换批
+  - 背景：Task 3 需要在 RECIPE_SELECTION 中主动换一批，同时保留 READY 首次生成合同。
+  - 选择：继续使用 `POST /api/sessions/{sessionId}/recipes`；按 session state 区分首次生成与 regenerate，成功写入新的三卡 set，GET/Repository 读取最新 active batch。
+  - 替代方案：新增 `/recipes/regenerate` route/use case；本轮不采用以避免复制既有 Provider、安全、租约和幂等管线。
+  - 后果：旧 batch 保留在数据库；新 batch 事务提交前旧 batch 可恢复，失败不改变会话状态。

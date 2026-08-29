@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -341,8 +341,8 @@ export class DrizzleRecipeRepository implements RecipeRepository {
   }
 
   findSetBySession(sessionId: string): RecipeSetRecord | null {
-    const initialSet = this.findInitialRecipeSetRows(sessionId)[0];
-    return initialSet === undefined ? null : toRecipeSetRecord(initialSet.recipeSet);
+    const activeSet = this.findInitialRecipeSetRows(sessionId).at(-1);
+    return activeSet === undefined ? null : toRecipeSetRecord(activeSet.recipeSet);
   }
 
   listBySession(sessionId: string): RecipeRecord[] {
@@ -639,7 +639,7 @@ export class DrizzleRecipeRepository implements RecipeRepository {
       .select()
       .from(recipeSets)
       .where(eq(recipeSets.sessionId, sessionId))
-      .orderBy(asc(recipeSets.createdAt), asc(recipeSets.id))
+      .orderBy(sql`rowid`)
       .all()
       .map((recipeSet) => ({ recipeSet, recipes: this.listBySet(recipeSet.id) }))
       .filter(({ recipeSet, recipes: recipeRows }) =>

@@ -110,6 +110,11 @@ const transitionTable: Record<SessionState, readonly TransitionRule[]> = {
   ],
   RECIPE_SELECTION: [
     {
+      event: SessionEvent.GENERATE_RECIPE_SET,
+      target: "RECIPE_SELECTION",
+      guard: hasReadyInput,
+    },
+    {
       event: SessionEvent.SELECT_RECIPE,
       target: "MIXING",
       guard: (context) => context.hasRecipeSet && context.hasSelectedRecipe,

@@ -954,6 +954,86 @@ describe("generateRecipeSet", () => {
     }
   });
 
+  it("regenerates a new three-card batch while staying in recipe selection", async () => {
+    const context = await createReadyContext();
+    const firstBatch = baseCandidateSet();
+    const secondBatch = baseCandidateSet();
+    secondBatch.recipes.forEach((recipe) => {
+      recipe.title = `换批-${recipe.title}`;
+    });
+    const provider = new RecordingRecipeProvider([firstBatch, secondBatch]);
+    const dependencies = createGenerateDependencies(context.database, provider, provider);
+
+    try {
+      const first = await generateRecipeSet(dependencies, {
+        sessionId: context.sessionId,
+        requestId: randomUUID(),
+        expectedVersion: context.expectedVersion,
+      });
+      const regenerateInput = {
+        sessionId: context.sessionId,
+        requestId: randomUUID(),
+        expectedVersion: first.response.session.version,
+      };
+      const regenerated = await generateRecipeSet(dependencies, regenerateInput);
+      const replay = await generateRecipeSet(dependencies, regenerateInput);
+
+      expect(provider.generateCalls).toBe(2);
+      expect(replay.replayed).toBe(true);
+      expect(replay.response).toEqual(regenerated.response);
+      expect(regenerated.response.session).toMatchObject({
+        state: "RECIPE_SELECTION",
+        version: first.response.session.version + 1,
+      });
+      expect(regenerated.response.data.recipeSet.recipes).toHaveLength(3);
+      expect(regenerated.response.data.recipeSet.recipes[0]?.title).toContain("换批-");
+      expect(context.database.db.select().from(recipeSets).all()).toHaveLength(2);
+      expect(context.database.db.select().from(recipes).all()).toHaveLength(6);
+      await expect(
+        generateRecipeSet(dependencies, {
+          ...regenerateInput,
+          requestId: randomUUID(),
+          expectedVersion: first.response.session.version - 1,
+        }),
+      ).rejects.toMatchObject({ code: "VERSION_CONFLICT" });
+      expect(provider.generateCalls).toBe(2);
+    } finally {
+      context.database.cleanup();
+    }
+  });
+
+  it("keeps the active batch and selection state when regeneration fails", async () => {
+    const context = await createReadyContext();
+    const firstBatch = baseCandidateSet();
+    const provider = new RecordingRecipeProvider([firstBatch, new Error("REGENERATE_FAILED")]);
+    const dependencies = createGenerateDependencies(context.database, provider, provider);
+
+    try {
+      const first = await generateRecipeSet(dependencies, {
+        sessionId: context.sessionId,
+        requestId: randomUUID(),
+        expectedVersion: context.expectedVersion,
+      });
+      await expect(
+        generateRecipeSet(dependencies, {
+          sessionId: context.sessionId,
+          requestId: randomUUID(),
+          expectedVersion: first.response.session.version,
+        }),
+      ).rejects.toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
+
+      const session = new DrizzleSessionRepository(context.database.db).findById(context.sessionId);
+      const activeSet = new DrizzleRecipeRepository(context.database.db).findSetBySession(
+        context.sessionId,
+      );
+      expect(session).toMatchObject({ state: "RECIPE_SELECTION", version: first.response.session.version });
+      expect(activeSet?.id).toBe(first.response.data.recipeSet.id);
+      expect(new DrizzleRecipeRepository(context.database.db).listBySet(activeSet?.id ?? "")).toHaveLength(3);
+    } finally {
+      context.database.cleanup();
+    }
+  });
+
   it("persists fallback provenance in the recipe set and audit event when Qwen internally degrades", async () => {
     const context = await createReadyContext();
     const primaryProvider = new OutcomeRecordingRecipeProvider({
