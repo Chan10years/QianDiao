@@ -786,8 +786,7 @@ describe("generateRecipeSet", () => {
       await flushAsyncWork();
       expect(qwenClient.requests).toHaveLength(2);
       expect(clock.now().getTime()).toBe(10_500);
-      expect(qwenClient.leaseRemainingMs[0]).toBe(11_000);
-      expect(qwenClient.leaseRemainingMs[1]).toBeGreaterThan(6_000);
+      expect(qwenClient.leaseRemainingMs).toEqual([61_000, 61_000]);
 
       qwenClient.releaseSecond();
       await expect(first).resolves.toMatchObject({ replayed: false });
@@ -881,7 +880,7 @@ describe("generateRecipeSet", () => {
         "adjust",
         "adjust",
       ]);
-      expect(qwenClient.leaseRemainingMs).toEqual([11_000, 11_000, 11_000]);
+      expect(qwenClient.leaseRemainingMs).toEqual([61_000, 61_000, 61_000]);
       expect(fallbackProvider.generateCalls).toBe(1);
       expect(result.response.data.recipeSet.sourceMode).toBe("fallback");
       expect(result.response.data.recipeSet.degraded).toBe(true);
@@ -1026,9 +1025,14 @@ describe("generateRecipeSet", () => {
       const activeSet = new DrizzleRecipeRepository(context.database.db).findSetBySession(
         context.sessionId,
       );
-      expect(session).toMatchObject({ state: "RECIPE_SELECTION", version: first.response.session.version });
+      expect(session).toMatchObject({
+        state: "RECIPE_SELECTION",
+        version: first.response.session.version,
+      });
       expect(activeSet?.id).toBe(first.response.data.recipeSet.id);
-      expect(new DrizzleRecipeRepository(context.database.db).listBySet(activeSet?.id ?? "")).toHaveLength(3);
+      expect(
+        new DrizzleRecipeRepository(context.database.db).listBySet(activeSet?.id ?? ""),
+      ).toHaveLength(3);
     } finally {
       context.database.cleanup();
     }
@@ -2127,7 +2131,7 @@ describe("generateRecipeSet", () => {
       ).rejects.toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
       expect(generateCalls).toBe(1);
 
-      clock.advance(11_001);
+      clock.advance(61_001);
       const retried = await generateRecipeSet(dependencies, input);
       expect(retried.replayed).toBe(false);
       expect(generateCalls).toBe(2);
@@ -2245,7 +2249,7 @@ describe("generateRecipeSet", () => {
     }
   });
 
-  it("covers the Qwen worst-case two-request budget with a real 10.5-second lease check before takeover", async () => {
+  it("covers the Qwen worst-case two-request budget with a real 60.5-second lease check before takeover", async () => {
     const context = await createReadyContext();
     const candidateSet = baseCandidateSet();
     const primaryProvider = new BlockingRecipeProvider(candidateSet, candidateSet.recipes[0]!);
@@ -2264,7 +2268,7 @@ describe("generateRecipeSet", () => {
         sleep: async () => {
           waitCalls += 1;
           if (waitCalls <= 5) {
-            clock.advance(2_100);
+            clock.advance(12_100);
           }
         },
       },
@@ -2287,11 +2291,11 @@ describe("generateRecipeSet", () => {
 
       expect(primaryProvider.generateCalls).toBe(1);
       expect(pendingRecord?.leaseOwner).not.toBeNull();
-      expect(pendingRecord?.leaseExpiresAt?.getTime()).toBe(11_000);
+      expect(pendingRecord?.leaseExpiresAt?.getTime()).toBe(61_000);
       expect(await secondOutcome).toMatchObject({
         error: { code: "IDEMPOTENCY_IN_PROGRESS" },
       });
-      expect(clock.now().getTime()).toBe(10_500);
+      expect(clock.now().getTime()).toBe(60_500);
       expect(primaryProvider.generateCalls).toBe(1);
       primaryProvider.release();
       await expect(first).resolves.toMatchObject({ replayed: false });
@@ -2320,7 +2324,7 @@ describe("generateRecipeSet", () => {
         leaseDurationMs: 1_000,
         maxWaitAttempts: 6,
         sleep: async () => {
-          clock.advance(2_500);
+          clock.advance(12_500);
         },
         leaseOwnerFactory: () => leaseOwners.shift() ?? "owner-c",
       },

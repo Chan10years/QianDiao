@@ -30,7 +30,7 @@ import {
 import { rankRecommendation } from "@/src/agent/rank-recommendation";
 import { FallbackRecipeProvider } from "@/src/infrastructure/providers/fallback-recipe-provider";
 
-export const QWEN_RECIPE_PROVIDER_TIMEOUT_MS = 15_000;
+export const QWEN_RECIPE_PROVIDER_TIMEOUT_MS = 30_000;
 export const QWEN_RECIPE_PROVIDER_MAX_REQUESTS_PER_OPERATION = 2;
 export const QWEN_RECIPE_PROVIDER_WORST_CASE_EXTERNAL_CALL_MS =
   QWEN_RECIPE_PROVIDER_TIMEOUT_MS * QWEN_RECIPE_PROVIDER_MAX_REQUESTS_PER_OPERATION;

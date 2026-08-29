@@ -48,6 +48,14 @@ function material(name: string, amountMl: number): RecipeMaterial {
   return { name, amountMl, unit: "ml" };
 }
 
+function formatMaterialList(materials: readonly RecipeMaterial[]): string {
+  const labels = materials.map((item) => `${item.name} ${item.amountMl}${item.unit}`);
+  if (labels.length <= 1) {
+    return labels[0] ?? "";
+  }
+  return `${labels.slice(0, -1).join("、")} 和${labels.at(-1)}`;
+}
+
 function sumVolume(materials: readonly RecipeMaterial[]): number {
   return materials.reduce((total, item) => total + item.amountMl, 0);
 }
@@ -147,43 +155,64 @@ function buildInitialCandidate(
   let steps: RecipeStep[];
 
   if (strategy === "A_CONSERVATIVE") {
-    materials = [material(spiritName, 30), ...supportMaterials];
+    const spiritMaterial = material(spiritName, 30);
+    materials = [spiritMaterial, ...supportMaterials];
     steps = [
       {
         order: 1,
-        instruction: "将已确认的白酒倒入杯中，加入桌面材料并轻轻搅拌。",
+        instruction:
+          supportMaterials.length > 0
+            ? `先将${formatMaterialList([spiritMaterial])}倒入杯中，再加入${formatMaterialList(supportMaterials)}，轻轻搅拌。`
+            : `先将${formatMaterialList([spiritMaterial])}倒入杯中，轻轻搅拌。`,
         isPhotoCheckpoint: true,
       },
       { order: 2, instruction: "静置 30 秒后小口试饮。", isPhotoCheckpoint: false },
     ];
   } else if (strategy === "B_CREATIVE") {
-    materials = [
-      material(spiritName, 35),
-      ...supportMaterials.map((item) => ({ ...item, amountMl: Math.max(5, item.amountMl - 5) })),
-    ];
-    steps = [
-      { order: 1, instruction: "先冷藏或用冰块降温桌面材料。", isPhotoCheckpoint: true },
-      {
-        order: 2,
-        instruction: "沿杯壁分两次加入白酒，最后轻轻搅拌。",
-        isPhotoCheckpoint: false,
-      },
-    ];
-  } else {
-    materials = [
-      material(spiritName, 30),
-      ...supportMaterials,
-      ...missingIngredients.map((name) => material(name, missingMaterialAmount(name))),
-    ];
+    const spiritMaterial = material(spiritName, 35);
+    const creativeSupportMaterials = supportMaterials.map((item) => ({
+      ...item,
+      amountMl: Math.max(5, item.amountMl - 5),
+    }));
+    materials = [spiritMaterial, ...creativeSupportMaterials];
     steps = [
       {
         order: 1,
-        instruction: "先加入受控的升级材料，再加入桌面已有材料。",
+        instruction:
+          creativeSupportMaterials.length > 0
+            ? `先加入${formatMaterialList(creativeSupportMaterials)}，充分降温。`
+            : "先将调饮杯充分降温。",
         isPhotoCheckpoint: true,
       },
       {
         order: 2,
-        instruction: "最后加入白酒，轻轻搅拌并试饮。",
+        instruction: `再沿杯壁分两次加入${formatMaterialList([spiritMaterial])}，轻轻搅拌后小口试饮。`,
+        isPhotoCheckpoint: false,
+      },
+    ];
+  } else {
+    const spiritMaterial = material(spiritName, 30);
+    const upgradeMaterials = missingIngredients.map((name) =>
+      material(name, missingMaterialAmount(name)),
+    );
+    materials = [spiritMaterial, ...supportMaterials, ...upgradeMaterials];
+    const firstInstruction =
+      upgradeMaterials.length > 0 && supportMaterials.length > 0
+        ? `先加入${formatMaterialList(upgradeMaterials)}，再加入${formatMaterialList(supportMaterials)}，轻轻搅拌。`
+        : upgradeMaterials.length > 0
+          ? `先加入${formatMaterialList(upgradeMaterials)}，轻轻搅拌。`
+          : supportMaterials.length > 0
+            ? `先加入${formatMaterialList(supportMaterials)}，轻轻搅拌。`
+            : "先准备好调饮杯。";
+    steps = [
+      {
+        order: 1,
+        instruction: firstInstruction,
+        isPhotoCheckpoint: true,
+      },
+      {
+        order: 2,
+        instruction: `最后加入${formatMaterialList([spiritMaterial])}，轻轻搅拌后小口试饮。`,
         isPhotoCheckpoint: false,
       },
     ];

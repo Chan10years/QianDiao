@@ -112,7 +112,6 @@ export function MixingScreen({
                 <p>
                   第 {index + 1} 步 · {STEP_STATE_LABELS[state]}
                 </p>
-                <p className="mixing-step__instruction">{recipeStep.instruction}</p>
               </div>
             </li>
           );
@@ -120,6 +119,7 @@ export function MixingScreen({
       </ol>
 
       <div className="mixing-screen__measure">
+        <p className="mobile-eyebrow">当前这一步</p>
         <h2>{step.instruction}</h2>
       </div>
 

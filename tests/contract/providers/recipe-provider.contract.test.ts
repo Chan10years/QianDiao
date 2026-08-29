@@ -272,6 +272,26 @@ describe("RecipeProvider contract", () => {
     await assertRecipeProviderContract(new FallbackRecipeProvider());
   });
 
+  it("fallback writes actionable instructions with every actual material and amount", async () => {
+    const generated = await new FallbackRecipeProvider().generate(generationInput);
+
+    for (const recipe of generated.recipes) {
+      const instructions = recipe.steps.map((step) => step.instruction).join("\n");
+      for (const material of recipe.materials) {
+        expect(instructions).toContain(`${material.name} ${material.amountMl}${material.unit}`);
+      }
+      expect(instructions).not.toContain("受控的升级材料");
+      expect(instructions).not.toContain("桌面已有材料");
+      expect(instructions).not.toContain("桌面材料");
+    }
+
+    const upgrade = generated.recipes.find((recipe) => recipe.strategy === "C_UPGRADE");
+    expect(upgrade?.steps.map((step) => step.instruction)).toEqual([
+      "先加入冰块 60ml 和柠檬 10ml，再加入苏打水 90ml，轻轻搅拌。",
+      "最后加入白酒 30ml，轻轻搅拌后小口试饮。",
+    ]);
+  });
+
   it("applies every nonzero adjustment to confirmed spirits and keeps the result safety-valid", async () => {
     const spiritNames = ["牛栏山", generationInput.ingredients[0]?.canonicalName ?? "白酒"];
     const adjustmentCases = [

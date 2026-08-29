@@ -25,7 +25,7 @@ export interface QwenVisionProviderOptions {
   imageLoader: VisionImageLoader;
 }
 
-export const QWEN_VISION_PROVIDER_TIMEOUT_MS = 20_000;
+export const QWEN_VISION_PROVIDER_TIMEOUT_MS = 30_000;
 
 function parseJsonResponse(response: string): unknown {
   const trimmed = response.trim();

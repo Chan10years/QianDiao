@@ -119,6 +119,20 @@ describe("mixing screen", () => {
     expect(steps[1]).toHaveAttribute("aria-current", "step");
     expect(steps[2]).toHaveAttribute("data-step-state", "pending");
 
+    const stepIndex = screen.getByRole("list", { name: "调饮步骤索引" });
+    expect(within(stepIndex).getByText("第 1 步 · 已完成")).toBeInTheDocument();
+    expect(within(stepIndex).getByText("第 2 步 · 当前")).toBeInTheDocument();
+    expect(within(stepIndex).getByText("第 3 步 · 待完成")).toBeInTheDocument();
+    expect(within(stepIndex).queryByText("先加入冰块并降温。")).not.toBeInTheDocument();
+    expect(within(stepIndex).queryByText("再分次加入白酒并轻轻搅拌。")).not.toBeInTheDocument();
+    expect(within(stepIndex).queryByText("最后用柠檬片点缀。")).not.toBeInTheDocument();
+
+    const currentInstruction = screen.getByRole("heading", {
+      name: "再分次加入白酒并轻轻搅拌。",
+    });
+    expect(currentInstruction.parentElement).toHaveTextContent("当前这一步");
+    expect(screen.getAllByText("再分次加入白酒并轻轻搅拌。")).toHaveLength(1);
+
     expect(screen.queryByText("当前这一步 · 用量参考")).not.toBeInTheDocument();
     expect(screen.queryByText("白酒 · 30 ml")).not.toBeInTheDocument();
     expect(screen.getByText(/共 3 步/)).toBeInTheDocument();
